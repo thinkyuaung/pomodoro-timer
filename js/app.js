@@ -386,7 +386,7 @@
       renderStats(); // also keeps "today" correct after midnight
       beep();
       announce(state.mode === 'focus'
-        ? 'Focus started.'
+        ? 'Break over. Focus is ready — press Start when you are.'
         : `Focus complete. ${MODE_NAMES[state.mode]} is ready — press Start when you are.`);
     },
 

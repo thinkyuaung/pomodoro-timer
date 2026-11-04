@@ -37,8 +37,8 @@ js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders
 ## Features
 - Start, pause, reset
 - Auto switch: focus (25 min) → short break (5 min); long break (15 min) after every 4 focus sessions
-  - When focus ends, the break is loaded but **waits for Start** (no auto-start)
-  - When a break ends, the next focus session **starts automatically**
+  - The timer switches to the next session automatically, but **never auto-starts** it: when focus ends the
+    break is loaded and waits for Start; when a break ends the next focus is loaded and waits for Start
 - Save each completed focus session: `{ date: "YYYY-MM-DD" (local), completedAt: ISO string, durationMin }`
 - Stats: sessions today, total focus time, daily (last 7 days) and weekly (last 8 weeks) history as CSS bars
 - Settings live in a **drop-down card** opened by the ⚙ button (top right); it closes on ⚙, ✕, Esc
@@ -103,7 +103,8 @@ Tip: set Focus/Short = 1 min, Long = 2, "Long break after" = 2 in Settings for a
 - [ ] First load: 25:00, Focus, "Session 1 of 4", stats 0 / 0m, empty-chart message, tab title "25:00 – Focus"
 - [ ] Start counts down; Pause holds the time (also after switching tabs and coming back)
 - [ ] Focus ends → beep, Short Break shown at full time but stopped (button says Start), "Sessions today" +1,
-      today's bar grows; pressing Start runs the break; when the break ends, focus starts automatically
+      today's bar grows; pressing Start runs the break; when the break ends, Focus is shown at full time but
+      stopped (button says Start) and site blocking stays off until Start
 - [ ] After N focus sessions → long break; after long break → "Session 1 of N"
 - [ ] Reset mid-focus → full time, stopped, nothing saved
 - [ ] Settings: invalid values (0, empty, 121) show errors and highlight fields; nothing saved
@@ -134,7 +135,8 @@ Site blocking (load the extension unpacked first; use `example.com` / `example.o
       the "Stay focused" page; `example.org` loads
 - [ ] A tab already open on `example.com` switches to the blocked page when focus starts
 - [ ] Pause → status disappears, `example.com` loads; resume → blocked again
-- [ ] Focus ends → break: nothing blocked; next focus → blocked again; Reset → nothing blocked
+- [ ] Focus ends → break: nothing blocked; break ends → focus waiting: nothing blocked; press Start → blocked
+      again; Reset → nothing blocked
 - [ ] Allowlist `example.com` → `example.org` blocked; `example.com`, `docs.example.com` and the timer itself load
 - [ ] Editing the site list or switching mode to Off mid-focus applies immediately
 - [ ] "Back to timer" on the blocked page switches to the **already running** timer tab (countdown continues),
