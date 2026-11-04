@@ -1,0 +1,549 @@
+/* ==========================================================================
+   Theme tokens — blue theme
+   ========================================================================== */
+:root {
+  --bg: #eef3fb;
+  --surface: #ffffff;
+  --panel: #f5f8fd;
+  --text: #0f1b2d;
+  --muted: #5b6b82;
+  --border: #dbe4f0;
+  --track: #e3ebf6;
+
+  --primary: #2563eb;
+  --primary-strong: #1d4ed8;
+  --focus: #2563eb;   /* blue   */
+  --short: #0891b2;   /* cyan   */
+  --long: #4f46e5;    /* indigo */
+  --accent: var(--focus);
+  --on-accent: #ffffff;
+
+  --success: #0f766e;
+  --danger: #dc2626;
+
+  --header-from: #1d4ed8;
+  --header-to: #3b82f6;
+
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow: 0 1px 2px rgb(15 27 45 / 0.05), 0 8px 24px rgb(37 99 235 / 0.08);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --surface: #121b2e;
+    --panel: #0f1828;
+    --text: #e5ecf6;
+    --muted: #94a3b8;
+    --border: #1f2a40;
+    --track: #1a2438;
+
+    --primary: #60a5fa;
+    --primary-strong: #3b82f6;
+    --focus: #60a5fa;
+    --short: #22d3ee;
+    --long: #818cf8;
+    --on-accent: #0b1220;
+
+    --success: #2dd4bf;
+    --danger: #f87171;
+
+    --header-from: #1e3a8a;
+    --header-to: #1d4ed8;
+
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  }
+}
+
+/* Per-mode accent color (set data-mode on .app) */
+.app[data-mode="focus"] { --accent: var(--focus); }
+.app[data-mode="short"] { --accent: var(--short); }
+.app[data-mode="long"]  { --accent: var(--long); }
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.5;
+}
+
+h1, h2, h3 { margin: 0; line-height: 1.2; }
+h3 { font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+
+[hidden] { display: none !important; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Layout — card grid
+   ========================================================================== */
+.app {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "header"
+    "timer"
+    "stats"
+    "settings";
+}
+.app-header { grid-area: header; }
+.timer      { grid-area: timer; }
+.stats      { grid-area: stats; }
+.settings   { grid-area: settings; }
+
+@media (min-width: 880px) {
+  .app {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    grid-template-areas:
+      "header header"
+      "timer  stats"
+      "settings settings";
+  }
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.card-title {
+  font-size: 1.15rem;
+  margin-bottom: 16px;
+}
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+.app-header {
+  background: linear-gradient(135deg, var(--header-from), var(--header-to));
+  border: 0;
+  color: #ffffff;
+  padding: 20px 24px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  border: 4px solid rgb(255 255 255 / 0.35);
+  border-top-color: #ffffff;
+  border-right-color: #ffffff;
+}
+.app-header h1 { font-size: 1.5rem; }
+.brand-sub {
+  margin: 2px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+.btn {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.05s;
+}
+.btn:hover { background: var(--track); }
+.btn:active { transform: translateY(1px); }
+
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-accent);
+  min-width: 128px;
+}
+.btn-primary:hover { background: var(--primary-strong); border-color: var(--primary-strong); }
+
+.timer .btn-primary { background: var(--accent); border-color: var(--accent); }
+.timer .btn-primary:hover { filter: brightness(1.08); }
+
+/* ==========================================================================
+   Timer card
+   ========================================================================== */
+.timer {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.modes {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 4px;
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: var(--panel);
+  border-radius: 999px;
+}
+.mode {
+  font-size: 0.85rem;
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: var(--muted);
+}
+.mode[aria-current="step"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.time {
+  font-size: clamp(4rem, 14vw, 6.5rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  transition: color 0.3s;
+}
+
+.progress {
+  width: 100%;
+  max-width: 320px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.progress-bar {
+  height: 100%;
+  width: var(--p, 0%);
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width 0.25s linear;
+}
+
+.cycle { margin: 0 0 16px; color: var(--muted); }
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.block-status {
+  margin: 16px 0 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Stats card
+   ========================================================================== */
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+}
+.tile-label { font-size: 0.8rem; color: var(--muted); }
+.tile-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toggle {
+  display: inline-flex;
+  background: var(--track);
+  border-radius: 999px;
+  padding: 3px;
+}
+.toggle-btn {
+  font: inherit;
+  font-size: 0.8rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.toggle-btn[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Bar chart: app.js renders
+   <div class="bar-col">
+     <span class="bar-value">25m</span>
+     <div class="bar-track"><div class="bar" style="--h: 60%"></div></div>
+     <span class="bar-label">Mon</span>
+   </div>
+*/
+.chart {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 200px;
+  padding: 12px 8px 4px;
+  background: var(--panel);
+  border-radius: var(--radius-sm);
+}
+.chart-empty {
+  margin: auto;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.bar-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.bar-track {
+  flex: 1;
+  width: 100%;
+  max-width: 36px;
+  display: flex;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--border);
+}
+.bar {
+  width: 100%;
+  height: var(--h, 0%);
+  min-height: 2px;
+  background: linear-gradient(to top, var(--primary-strong), var(--primary));
+  opacity: 0.75;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.4s ease;
+}
+.bar-col.is-current .bar { opacity: 1; }
+.bar-value,
+.bar-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bar-col.is-current .bar-label { color: var(--primary); font-weight: 700; }
+
+/* ==========================================================================
+   Settings card
+   ========================================================================== */
+.settings-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+@media (min-width: 880px) {
+  .settings-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+/* Inner cards */
+.panel {
+  margin: 0;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.panel-title {
+  float: left;          /* keeps the legend inside the panel's padding box */
+  width: 100%;
+  padding: 0;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.field small { font-weight: 400; }
+.field input,
+.field textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.field textarea {
+  resize: vertical;
+  min-height: 110px;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.85rem;
+}
+.field input:focus,
+.field textarea:focus { border-color: var(--primary); }
+.field input[aria-invalid="true"],
+.field textarea[aria-invalid="true"] { border-color: var(--danger); }
+
+/* Segmented radio control */
+.segmented {
+  display: flex;
+  background: var(--track);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.segmented label {
+  flex: 1;
+  position: relative;
+}
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.segmented span {
+  display: block;
+  text-align: center;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.segmented input:checked + span {
+  background: var(--primary);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.segmented input:focus-visible + span {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.hint,
+.note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.note {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+}
+
+.form-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  min-height: 1.2em;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+.form-error.is-success { color: var(--success); }
+
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ==========================================================================
+   Small screens
+   ========================================================================== */
+@media (max-width: 420px) {
+  .card { padding: 18px; }
+  .fields { grid-template-columns: 1fr; }
+  .chart-header { flex-direction: column; align-items: flex-start; }
+  .bar-value { display: none; }
+  .segmented { flex-direction: column; border-radius: var(--radius-sm); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

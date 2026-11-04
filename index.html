@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pomodoro Timer</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="app" data-mode="focus">
+    <!-- Header -->
+    <header class="card app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>Pomodoro</h1>
+          <p class="brand-sub">Focus timer with stats &amp; site blocking</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Timer -->
+    <section class="card timer" aria-labelledby="timer-heading">
+      <h2 id="timer-heading" class="visually-hidden">Timer</h2>
+
+      <ol class="modes" aria-label="Current mode">
+        <li class="mode" data-mode="focus" aria-current="step">Focus</li>
+        <li class="mode" data-mode="short">Short Break</li>
+        <li class="mode" data-mode="long">Long Break</li>
+      </ol>
+
+      <div id="time" class="time" role="timer" aria-live="off">25:00</div>
+
+      <div class="progress" aria-hidden="true"><div id="progressBar" class="progress-bar"></div></div>
+
+      <p id="cycle" class="cycle">Session 1 of 4</p>
+
+      <div class="controls">
+        <button id="startPause" type="button" class="btn btn-primary">Start</button>
+        <button id="reset" type="button" class="btn">Reset</button>
+      </div>
+
+      <p id="blockStatus" class="block-status" hidden></p>
+      <p id="status" class="visually-hidden" aria-live="polite"></p>
+    </section>
+
+    <!-- Stats -->
+    <section class="card stats" aria-labelledby="stats-heading">
+      <h2 id="stats-heading" class="card-title">Stats</h2>
+
+      <div class="tiles">
+        <div class="tile">
+          <span class="tile-label">Sessions today</span>
+          <span id="todayCount" class="tile-value">0</span>
+        </div>
+        <div class="tile">
+          <span class="tile-label">Total focus time</span>
+          <span id="totalFocus" class="tile-value">0m</span>
+        </div>
+      </div>
+
+      <div class="chart-header">
+        <h3 id="chart-heading">Focus history</h3>
+        <div class="toggle" role="group" aria-label="History range">
+          <button type="button" class="toggle-btn" data-range="daily" aria-pressed="true">Daily</button>
+          <button type="button" class="toggle-btn" data-range="weekly" aria-pressed="false">Weekly</button>
+        </div>
+      </div>
+
+      <div id="chart" class="chart" role="img" aria-labelledby="chart-heading">
+        <p class="chart-empty">No sessions yet — finish a focus session to see your history.</p>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="card settings" aria-labelledby="settings-heading">
+      <h2 id="settings-heading" class="card-title">Settings</h2>
+
+      <form id="settingsForm" class="settings-form" novalidate>
+        <!-- Durations -->
+        <fieldset class="panel">
+          <legend class="panel-title">Durations</legend>
+          <div class="fields">
+            <label class="field">
+              <span>Focus (min)</span>
+              <input type="number" name="focus" min="1" max="120" step="1" value="25" required>
+            </label>
+            <label class="field">
+              <span>Short break (min)</span>
+              <input type="number" name="short" min="1" max="120" step="1" value="5" required>
+            </label>
+            <label class="field">
+              <span>Long break (min)</span>
+              <input type="number" name="long" min="1" max="120" step="1" value="15" required>
+            </label>
+            <label class="field">
+              <span>Long break after (sessions)</span>
+              <input type="number" name="longEvery" min="1" max="12" step="1" value="4" required>
+            </label>
+          </div>
+          <p class="hint">Duration changes apply from the next session if the timer is running.</p>
+        </fieldset>
+
+        <!-- Site blocking -->
+        <fieldset class="panel">
+          <legend class="panel-title">Site blocking <span class="badge">focus only</span></legend>
+
+          <div class="segmented" role="radiogroup" aria-label="Blocking mode">
+            <label><input type="radio" name="blockMode" value="off" checked><span>Off</span></label>
+            <label><input type="radio" name="blockMode" value="blocklist"><span>Block listed</span></label>
+            <label><input type="radio" name="blockMode" value="allowlist"><span>Allow only listed</span></label>
+          </div>
+
+          <p id="modeHint" class="hint">Blocking is off. All sites are allowed during focus.</p>
+
+          <label class="field site-list" data-for-mode="blocklist" hidden>
+            <span>Disallowed sites <small>(one per line)</small></span>
+            <textarea name="blockedSites" rows="5" spellcheck="false" autocapitalize="off"
+                      placeholder="youtube.com&#10;reddit.com&#10;x.com"></textarea>
+          </label>
+
+          <label class="field site-list" data-for-mode="allowlist" hidden>
+            <span>Allowed sites <small>(one per line)</small></span>
+            <textarea name="allowedSites" rows="5" spellcheck="false" autocapitalize="off"
+                      placeholder="docs.google.com&#10;github.com&#10;stackoverflow.com"></textarea>
+          </label>
+
+          <p id="blockerNote" class="note">
+            Sites are only blocked when this app is installed as a browser extension
+            (Chrome/Edge → Extensions → Developer mode → Load unpacked).
+          </p>
+        </fieldset>
+
+        <p id="settingsError" class="form-error" role="alert"></p>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Save settings</button>
+          <button type="button" id="restoreDefaults" class="btn">Restore defaults</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script defer src="js/storage.js"></script>
+  <script defer src="js/timer.js"></script>
+  <script defer src="js/stats.js"></script>
+  <script defer src="js/app.js"></script>
+</body>
+</html>
