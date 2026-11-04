@@ -33,6 +33,9 @@
     blockingSummary: $('#blockingSummary'),
     dataSummary: $('#dataSummary'),
     clearHistory: $('#clearHistory'),
+    settingsMenu: $('.settings-menu'),
+    gearBtn: $('.gear-btn'),
+    closeSettings: $('#closeSettings'),
   };
 
   const MODE_NAMES = { focus: 'Focus', short: 'Short Break', long: 'Long Break' };
@@ -131,7 +134,9 @@
     const el = els.form.elements[field];
     const target = el instanceof HTMLElement ? el : el && el[0]; // RadioNodeList → first radio
     if (!target) return;
-    const row = target.closest('details');
+    const menu = target.closest('.settings-menu');
+    if (menu) menu.open = true; // the settings drop-down card
+    const row = target.closest('.setting-row');
     if (row) row.open = true;
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -410,6 +415,27 @@
   els.form.addEventListener('submit', onSettingsSubmit);
   els.restoreDefaults.addEventListener('click', onRestoreDefaults);
   els.clearHistory.addEventListener('click', onClearHistory);
+
+  // Settings drop-down card (<details class="settings-menu">): ⚙ toggles it natively;
+  // ✕, Esc and a click outside also close it.
+  function closeSettingsMenu(returnFocus) {
+    if (!els.settingsMenu.open) return;
+    els.settingsMenu.open = false;
+    if (returnFocus) els.gearBtn.focus();
+  }
+
+  els.closeSettings.addEventListener('click', () => closeSettingsMenu(true));
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && els.settingsMenu.open) {
+      event.preventDefault();
+      closeSettingsMenu(true);
+    }
+  });
+
+  document.addEventListener('pointerdown', (event) => {
+    if (els.settingsMenu.open && !els.settingsMenu.contains(event.target)) closeSettingsMenu(false);
+  });
   els.form.addEventListener('change', (event) => {
     if (event.target.name === 'blockMode') renderBlockModeUI();
   });

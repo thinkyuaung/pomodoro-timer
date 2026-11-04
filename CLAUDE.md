@@ -20,10 +20,10 @@ and (when installed as a Chrome/Edge extension) blocks distracting websites duri
 
 ## Structure
 ```
-index.html        Markup only: decorative sky scene + app cards; loads the scripts in order
-blocked.html      Static "blocked during focus" page (same sky scene, no scripts)
+index.html        Markup only: decorative pastel scene + one-screen app; loads the scripts in order
+blocked.html      Static "blocked during focus" page (same pastel scene, no scripts)
 manifest.json     Manifest V3 extension definition (permissions, background worker, toolbar action)
-css/style.css     Theme tokens, sky scene art, glass cards, settings rows, CSS bar chart, blocked page
+css/style.css     Theme tokens, pastel scene, glass cards, progress ring, settings drop-down, chart, blocked page
 js/storage.js     AppStorage object: settings (incl. site lists) + session history in localStorage
 js/timer.js       Timer object: countdown engine and focus/break mode switching
 js/stats.js       Stats object: pure calculations over saved sessions
@@ -37,11 +37,13 @@ js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders
 - Auto switch: focus (25 min) → short break (5 min); long break (15 min) after every 4 focus sessions
 - Save each completed focus session: `{ date: "YYYY-MM-DD" (local), completedAt: ISO string, durationMin }`
 - Stats: sessions today, total focus time, daily (last 7 days) and weekly (last 8 weeks) history as CSS bars
-- Settings shown as browser-style expandable rows (one open at a time), each with a live one-line summary:
+- Settings live in a **drop-down card** opened by the ⚙ button (top right); it closes on ⚙, ✕, Esc
+  (focus returns to ⚙) or a click outside. Inside are browser-style expandable rows (one open at a time),
+  each with a live one-line summary:
   - **Timer durations** — custom durations (validated 1–120 min) and "long break after N sessions" (1–12)
   - **Site blocking** — see below
   - **Data** — "Clear focus history" (asks for confirmation; cannot be undone)
-  - Save / Restore defaults live in a footer below the rows; a failed save opens the row with the invalid field
+  - Save / Restore defaults live in a footer below the rows; a failed save opens the card and the row with the invalid field
 - Site blocking settings (extension only):
   - Mode: `off` (default) | `blocklist` (block only disallowed sites) | `allowlist` (block every site except allowed ones)
   - Lists: one site per line; input like `https://www.youtube.com/watch` is normalized to `youtube.com`;
@@ -64,19 +66,24 @@ js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders
 - Accessibility: real `<button>` elements, visible focus styles, `aria-live` on the time display
 
 ## Design
-- Theme: **anime blue sky** — sky gradient, sun glow, drifting clouds, layered hills, falling sakura petals;
-  dark mode (`prefers-color-scheme: dark`) = starry night sky with a crescent moon
-- All artwork is original CSS + inline SVG: **no images, web fonts, icon fonts or CDNs**; system fonts only
-  (`Yu Gothic UI` / `Meiryo` cover the Japanese text)
+- Theme: **soft pastel dreamy** — lavender → pink → baby-blue gradient, large blurred drifting light blobs,
+  twinkling four-point sparkles, a few falling sakura petals; dark mode (`prefers-color-scheme: dark`) = dusky violet
+- **One screen, no page scroll:** `body { overflow: hidden }`, `.app` is `100dvh` (top bar + `.stage`);
+  timer and stats side by side, stacked below 860px; sizes use `clamp()`/`vh` so it fits from phone to desktop.
+  Only windows shorter than 560px fall back to page scrolling. The settings card scrolls inside itself if needed
+- Timer is a **progress ring**: `#progressBar.ring-progress` is a conic-gradient masked into a ring, driven by the
+  `--p` percentage that `app.js` sets; ring size is the `--ring` custom property on `.timer`
+- Settings drop-down is native `<details class="settings-menu">` (⚙ = its `<summary>`) holding
+  `<section class="settings-card">`; rows are `<details class="setting-row" name="settings">` (exclusive accordion);
+  row summaries (`#durationsSummary`, `#blockingSummary`, `#dataSummary`) always describe the **saved** settings
+- All artwork is original CSS + inline SVG: **no images, web fonts, icon fonts or CDNs**; rounded system fonts only
+  (`ui-rounded` / `Segoe UI Variable Display`; `Yu Gothic UI` / `Meiryo` for Japanese)
 - The scene is one `<div class="scene" aria-hidden="true">` fixed behind `.app` (`pointer-events: none`);
   `index.html` and `blocked.html` contain the same scene markup — keep them in sync
-- Cards are frosted glass (`--glass` + `backdrop-filter`); accents: mode colors (focus blue, short cyan,
-  long indigo) + sakura pink (`--sakura`) for badges, progress gradient and today's bar
+- Cards are frosted glass (`--glass`, `--glass-strong` + `backdrop-filter`); accents: violet `--primary`,
+  sakura pink `--sakura`; mode colors focus lavender / short mint / long sky; buttons use a violet → pink gradient
 - Colors are CSS custom properties on `:root`, redefined in the dark-mode media query — never hard-code colors in rules
-- Animate only `transform`/`opacity`/`translate`; `prefers-reduced-motion: reduce` stops every animation
-- Settings rows are native `<details class="setting-row" name="settings">` (exclusive accordion, no JS);
-  row summaries (`#durationsSummary`, `#blockingSummary`, `#dataSummary`) always describe the **saved** settings
-- Layout: card grid — header full width, timer + stats side by side ≥ 880px, settings full width; single column below
+- Animate only `transform`/`opacity`; `prefers-reduced-motion: reduce` stops every animation and hides petals
 
 ## Running
 - **Timer only:** open `index.html` directly in a browser (works from `file://`). No install or server required.
@@ -102,13 +109,16 @@ Tip: set Focus/Short = 1 min, Long = 2, "Long break after" = 2 in Settings for a
 - [ ] Dark mode and ~360px width look correct
 
 Settings rows and theme:
+- [ ] ⚙ opens the settings card (gear turns violet); ✕, Esc (focus back on ⚙) and a click outside close it
 - [ ] All three rows start closed; opening one closes the other; chevron flips; keyboard Enter/Space toggles a row
 - [ ] Row summaries match saved settings (e.g. "50 / 10 / 20 min · long break every 3", "Blocking 3 sites during focus")
       and do not change until Save
 - [ ] Invalid value in a closed row → Save opens that row and focuses the field
 - [ ] Data → Clear focus history: Cancel keeps everything; OK empties stats/chart and the summary says "0 focus sessions saved"
-- [ ] Sky scene: clouds drift, petals fall; dark mode shows stars + moon; OS "reduce motion" freezes the scene
-- [ ] Glass cards stay readable over the sky in light and dark mode
+- [ ] No page scrollbar at desktop (1280×760), laptop (1366×640) and phone (390×844) sizes
+- [ ] Progress ring fills violet → pink as the session runs
+- [ ] Scene: blobs drift, sparkles twinkle, petals fall; dark mode is dusky violet; OS "reduce motion" freezes it
+- [ ] Glass cards stay readable over the pastel background in light and dark mode
 
 Site blocking (load the extension unpacked first; use `example.com` / `example.org` as test sites):
 - [ ] Extension page: "install as extension" note hidden; toolbar icon opens/focuses the timer tab
@@ -122,7 +132,7 @@ Site blocking (load the extension unpacked first; use `example.com` / `example.o
 - [ ] Editing the site list or switching mode to Off mid-focus applies immediately
 - [ ] "Back to timer" on the blocked page opens the timer and does NOT end blocking
 - [ ] Close the timer tab mid-focus → still blocked until the session's end time, then unblocked
-- [ ] Blocked page shows the sky scene and "集中しよう！ Stay focused" card in light and dark mode
+- [ ] Blocked page shows the pastel scene and "集中しよう！ Stay focused" card in light and dark mode
 
 Known behaviour: the timer itself is not persisted, so reloading the timer tab mid-focus shows an idle
 timer while blocking continues until that session's original end time (the background alarm ends it).
