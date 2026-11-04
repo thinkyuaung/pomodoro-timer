@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blocked during focus</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="blocked-page">
+  <!-- Same decorative sky scene as index.html (keep the two in sync) -->
+  <div class="scene" aria-hidden="true">
+    <div class="stars"></div>
+    <div class="sun"></div>
+    <div class="cloud"></div>
+    <div class="cloud"></div>
+    <div class="cloud"></div>
+    <div class="cloud"></div>
+    <svg class="hills" viewBox="0 0 1440 320" preserveAspectRatio="none" focusable="false">
+      <path class="hill hill-far"  d="M0 190 C 240 110 420 150 640 165 C 860 180 1080 100 1440 140 L1440 320 L0 320 Z"/>
+      <path class="hill hill-mid"  d="M0 240 C 200 190 380 205 560 228 C 760 255 980 185 1200 205 C 1300 214 1380 226 1440 222 L1440 320 L0 320 Z"/>
+      <path class="hill hill-near" d="M0 282 C 220 250 460 268 720 284 C 980 300 1200 258 1440 270 L1440 320 L0 320 Z"/>
+    </svg>
+    <div class="petals">
+      <span class="petal"></span><span class="petal"></span><span class="petal"></span>
+      <span class="petal"></span><span class="petal"></span><span class="petal"></span>
+      <span class="petal"></span><span class="petal"></span><span class="petal"></span>
+      <span class="petal"></span><span class="petal"></span><span class="petal"></span>
+    </div>
+  </div>
+
+  <main class="card blocked-card">
+    <svg class="brand-mark blocked-mark" viewBox="-20 -20 40 40" aria-hidden="true" focusable="false">
+      <g class="sakura-petals">
+        <ellipse rx="6.5" ry="10" cy="-9"/>
+        <ellipse rx="6.5" ry="10" cy="-9" transform="rotate(72)"/>
+        <ellipse rx="6.5" ry="10" cy="-9" transform="rotate(144)"/>
+        <ellipse rx="6.5" ry="10" cy="-9" transform="rotate(216)"/>
+        <ellipse rx="6.5" ry="10" cy="-9" transform="rotate(288)"/>
+      </g>
+      <circle class="sakura-center" r="3.5"/>
+    </svg>
+    <p class="blocked-ja" lang="ja">集中しよう！</p>
+    <h1>Stay focused</h1>
+    <p>This site is blocked during your focus session.<br>
+       It will be available again when the session ends or you pause the timer.</p>
+    <a class="btn btn-primary" href="index.html">Back to timer</a>
+  </main>
+</body>
+</html>

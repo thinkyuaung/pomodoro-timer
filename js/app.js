@@ -27,6 +27,12 @@
     progressBar: $('#progressBar'),
     modeHint: $('#modeHint'),
     siteLists: document.querySelectorAll('.site-list'),
+    blockStatus: $('#blockStatus'),
+    blockerNote: $('#blockerNote'),
+    durationsSummary: $('#durationsSummary'),
+    blockingSummary: $('#blockingSummary'),
+    dataSummary: $('#dataSummary'),
+    clearHistory: $('#clearHistory'),
   };
 
   const MODE_NAMES = { focus: 'Focus', short: 'Short Break', long: 'Long Break' };
@@ -41,6 +47,11 @@
   };
 
   let chartRange = 'daily';
+  let currentSettings = AppStorage.getSettings();
+  // What was last sent to SiteBlocker (avoids a message every tick). Starts as 'none' so a
+  // freshly opened page (e.g. "Back to timer" from the blocked page) never clears rules
+  // another timer tab set; leftover rules always expire via the background's end-time alarm.
+  let lastBlockKey = 'none';
 
   // ---------- formatting ----------
 
@@ -89,6 +100,53 @@
     els.todayCount.textContent = String(Stats.sessionsToday(sessions));
     els.totalFocus.textContent = Stats.formatMinutes(Stats.totalFocusMinutes(sessions));
     renderChart(sessions);
+    renderSettingSummaries(sessions);
+  }
+
+  // ---------- settings row summaries (always describe what is SAVED) ----------
+
+  function plural(n, word) {
+    return `${n} ${word}${n === 1 ? '' : 's'}`;
+  }
+
+  function blockingSummaryText(settings) {
+    const { blockMode, blockedSites, allowedSites } = settings;
+    if (blockMode === 'off') return 'Off';
+    const text = blockMode === 'blocklist'
+      ? `Blocking ${plural(blockedSites.length, 'site')} during focus`
+      : `Only ${plural(allowedSites.length, 'site')} allowed during focus`;
+    return SiteBlocker.isAvailable() ? text : `${text} · needs the extension`;
+  }
+
+  function renderSettingSummaries(sessions = AppStorage.getSessions()) {
+    const s = currentSettings;
+    els.durationsSummary.textContent =
+      `${s.focus} / ${s.short} / ${s.long} min · long break every ${s.longEvery}`;
+    els.blockingSummary.textContent = blockingSummaryText(s);
+    els.dataSummary.textContent = `${plural(sessions.length, 'focus session')} saved`;
+  }
+
+  /** Opens the settings row that contains the given field so its error is visible. */
+  function revealField(field) {
+    const el = els.form.elements[field];
+    const target = el instanceof HTMLElement ? el : el && el[0]; // RadioNodeList → first radio
+    if (!target) return;
+    const row = target.closest('details');
+    if (row) row.open = true;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  function onClearHistory() {
+    const count = AppStorage.getSessions().length;
+    if (count === 0) {
+      showFormMessage('There is no focus history to clear.', true);
+      return;
+    }
+    if (!window.confirm(`Delete all ${plural(count, 'saved focus session')}? This cannot be undone.`)) return;
+    AppStorage.clearSessions();
+    renderStats();
+    showFormMessage('Focus history cleared.', true);
   }
 
   function renderChart(sessions) {
@@ -182,12 +240,39 @@
 
   // ---------- settings form ----------
 
-  function fillForm(settings) {
-    for (const field of SETTING_FIELDS) {
-      const input = els.form.elements[field];
-      input.value = settings[field];
-      input.removeAttribute('aria-invalid');
+  /** Sets aria-invalid on every field listed (radio groups are skipped). */
+  function markInvalid(invalidFields) {
+    for (const field of ALL_FIELDS) {
+      const el = els.form.elements[field];
+      if (!(el instanceof HTMLElement)) continue; // RadioNodeList
+      if (invalidFields.includes(field)) el.setAttribute('aria-invalid', 'true');
+      else el.removeAttribute('aria-invalid');
     }
+  }
+
+  function selectedBlockMode() {
+    return els.form.elements.blockMode.value || 'off';
+  }
+
+  /** Shows only the site list that belongs to the selected mode. */
+  function renderBlockModeUI() {
+    const mode = selectedBlockMode();
+    els.siteLists.forEach((list) => {
+      list.hidden = list.dataset.forMode !== mode;
+    });
+    els.modeHint.textContent = MODE_HINTS[mode];
+  }
+
+  function fillForm(settings) {
+    for (const field of NUMBER_FIELDS) {
+      els.form.elements[field].value = settings[field];
+    }
+    els.form.elements.blockMode.value = settings.blockMode;
+    for (const field of SITE_FIELDS) {
+      els.form.elements[field].value = settings[field].join('\n');
+    }
+    markInvalid([]);
+    renderBlockModeUI();
   }
 
   function showFormMessage(text, isSuccess = false) {
@@ -195,11 +280,16 @@
     els.formMsg.classList.toggle('is-success', isSuccess);
   }
 
+  /** Raw form values; AppStorage does all validation and site normalization. */
   function readForm() {
-    const values = { ...AppStorage.getSettings() }; // keep fields the form doesn't show yet
-    for (const field of SETTING_FIELDS) {
+    const values = {};
+    for (const field of NUMBER_FIELDS) {
       const raw = els.form.elements[field].value.trim();
       values[field] = raw === '' ? NaN : Number(raw);
+    }
+    values.blockMode = selectedBlockMode();
+    for (const field of SITE_FIELDS) {
+      values[field] = els.form.elements[field].value; // newline-separated text
     }
     return values;
   }
@@ -208,37 +298,83 @@
     return appliedNow ? 'Saved.' : 'Saved. New durations apply from the next session.';
   }
 
+  function durationsChanged(before, after) {
+    return NUMBER_FIELDS.some((field) => before[field] !== after[field]);
+  }
+
   function onSettingsSubmit(event) {
     event.preventDefault();
+    const before = AppStorage.getSettings();
     const result = AppStorage.saveSettings(readForm());
-
-    for (const field of SETTING_FIELDS) {
-      const input = els.form.elements[field];
-      if (result.invalidFields.includes(field)) input.setAttribute('aria-invalid', 'true');
-      else input.removeAttribute('aria-invalid');
-    }
+    markInvalid(result.invalidFields);
 
     if (!result.ok) {
       showFormMessage(result.errors.join(' '));
+      revealField(result.invalidFields[0]); // never leave an error hidden in a closed row
       return;
     }
+    fillForm(result.settings); // show normalized sites (e.g. "https://www.x.com/a" → "x.com")
+    currentSettings = result.settings;
+    renderSettingSummaries();
     const appliedNow = timer.updateSettings(result.settings);
-    showFormMessage(appliedMessage(appliedNow), true);
+    showFormMessage(appliedMessage(appliedNow || !durationsChanged(before, result.settings)), true);
     renderMode(timer.getState());
+    syncBlocking(timer.getState()); // site settings apply immediately
   }
 
   function onRestoreDefaults() {
     const defaults = AppStorage.resetSettings();
     fillForm(defaults);
+    currentSettings = defaults;
+    renderSettingSummaries();
     const appliedNow = timer.updateSettings(defaults);
     showFormMessage(appliedMessage(appliedNow).replace('Saved', 'Defaults restored'), true);
     renderMode(timer.getState());
+    syncBlocking(timer.getState());
+  }
+
+  // ---------- site blocking ----------
+
+  /** What should be blocked right now, or null. Only while a focus session is running. */
+  function desiredBlock(state) {
+    if (state.mode !== 'focus' || !state.running) return null;
+    const { blockMode, blockedSites, allowedSites } = currentSettings;
+    if (blockMode === 'blocklist' && blockedSites.length > 0) return { mode: blockMode, sites: blockedSites };
+    if (blockMode === 'allowlist' && allowedSites.length > 0) return { mode: blockMode, sites: allowedSites };
+    return null;
+  }
+
+  function blockStatusText(block) {
+    const n = block.sites.length;
+    const sites = n === 1 ? 'site' : 'sites';
+    return block.mode === 'blocklist' ? `Blocking ${n} ${sites}` : `Only ${n} ${sites} allowed`;
+  }
+
+  function renderBlockStatus(block) {
+    const show = block !== null && SiteBlocker.isAvailable();
+    els.blockStatus.hidden = !show;
+    els.blockStatus.textContent = show ? blockStatusText(block) : '';
+  }
+
+  /** Sends apply/clear to the extension only when the desired blocking actually changes. */
+  function syncBlocking(state) {
+    const block = desiredBlock(state);
+    const key = block ? JSON.stringify(block) : 'none';
+    if (key === lastBlockKey) return;
+    lastBlockKey = key;
+
+    renderBlockStatus(block);
+    if (block) SiteBlocker.apply({ ...block, endTime: Date.now() + state.remainingMs });
+    else SiteBlocker.clear();
   }
 
   // ---------- timer ----------
 
-  const timer = Timer.create(AppStorage.getSettings(), {
-    onTick: renderTimer,
+  const timer = Timer.create(currentSettings, {
+    onTick(state) {
+      renderTimer(state);
+      syncBlocking(state); // start/pause/reset/mode switch all emit a tick
+    },
 
     onModeChange(state) {
       renderMode(state);
@@ -273,6 +409,10 @@
 
   els.form.addEventListener('submit', onSettingsSubmit);
   els.restoreDefaults.addEventListener('click', onRestoreDefaults);
+  els.clearHistory.addEventListener('click', onClearHistory);
+  els.form.addEventListener('change', (event) => {
+    if (event.target.name === 'blockMode') renderBlockModeUI();
+  });
 
   // Keyboard: Space = start/pause, R = reset.
   // Ignored while typing; Space is also left alone on buttons/summary (native activation).
@@ -296,9 +436,11 @@
 
   // ---------- init ----------
 
-  fillForm(AppStorage.getSettings());
+  fillForm(currentSettings);
+  els.blockerNote.hidden = SiteBlocker.isAvailable();
   const initial = timer.getState();
   renderMode(initial);
   renderTimer(initial);
   renderStats();
+  renderBlockStatus(null);
 })();

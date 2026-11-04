@@ -20,10 +20,10 @@ and (when installed as a Chrome/Edge extension) blocks distracting websites duri
 
 ## Structure
 ```
-index.html        Markup only; loads the scripts in order
-blocked.html      Static "blocked during focus" page shown in place of a blocked site (no scripts)
+index.html        Markup only: decorative sky scene + app cards; loads the scripts in order
+blocked.html      Static "blocked during focus" page (same sky scene, no scripts)
 manifest.json     Manifest V3 extension definition (permissions, background worker, toolbar action)
-css/style.css     Layout, theme variables, per-mode accent colors, CSS bar chart, blocked page
+css/style.css     Theme tokens, sky scene art, glass cards, settings rows, CSS bar chart, blocked page
 js/storage.js     AppStorage object: settings (incl. site lists) + session history in localStorage
 js/timer.js       Timer object: countdown engine and focus/break mode switching
 js/stats.js       Stats object: pure calculations over saved sessions
@@ -37,7 +37,11 @@ js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders
 - Auto switch: focus (25 min) → short break (5 min); long break (15 min) after every 4 focus sessions
 - Save each completed focus session: `{ date: "YYYY-MM-DD" (local), completedAt: ISO string, durationMin }`
 - Stats: sessions today, total focus time, daily (last 7 days) and weekly (last 8 weeks) history as CSS bars
-- Settings for custom durations (validated 1–120 min)
+- Settings shown as browser-style expandable rows (one open at a time), each with a live one-line summary:
+  - **Timer durations** — custom durations (validated 1–120 min) and "long break after N sessions" (1–12)
+  - **Site blocking** — see below
+  - **Data** — "Clear focus history" (asks for confirmation; cannot be undone)
+  - Save / Restore defaults live in a footer below the rows; a failed save opens the row with the invalid field
 - Site blocking settings (extension only):
   - Mode: `off` (default) | `blocklist` (block only disallowed sites) | `allowlist` (block every site except allowed ones)
   - Lists: one site per line; input like `https://www.youtube.com/watch` is normalized to `youtube.com`;
@@ -58,6 +62,21 @@ js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders
 - Charts: plain `<div>` bars sized via a CSS custom property (`--h`); no canvas libraries
 - Use `const`/`let`, `===`, small named functions; no inline `onclick` attributes in HTML
 - Accessibility: real `<button>` elements, visible focus styles, `aria-live` on the time display
+
+## Design
+- Theme: **anime blue sky** — sky gradient, sun glow, drifting clouds, layered hills, falling sakura petals;
+  dark mode (`prefers-color-scheme: dark`) = starry night sky with a crescent moon
+- All artwork is original CSS + inline SVG: **no images, web fonts, icon fonts or CDNs**; system fonts only
+  (`Yu Gothic UI` / `Meiryo` cover the Japanese text)
+- The scene is one `<div class="scene" aria-hidden="true">` fixed behind `.app` (`pointer-events: none`);
+  `index.html` and `blocked.html` contain the same scene markup — keep them in sync
+- Cards are frosted glass (`--glass` + `backdrop-filter`); accents: mode colors (focus blue, short cyan,
+  long indigo) + sakura pink (`--sakura`) for badges, progress gradient and today's bar
+- Colors are CSS custom properties on `:root`, redefined in the dark-mode media query — never hard-code colors in rules
+- Animate only `transform`/`opacity`/`translate`; `prefers-reduced-motion: reduce` stops every animation
+- Settings rows are native `<details class="setting-row" name="settings">` (exclusive accordion, no JS);
+  row summaries (`#durationsSummary`, `#blockingSummary`, `#dataSummary`) always describe the **saved** settings
+- Layout: card grid — header full width, timer + stats side by side ≥ 880px, settings full width; single column below
 
 ## Running
 - **Timer only:** open `index.html` directly in a browser (works from `file://`). No install or server required.
@@ -81,6 +100,32 @@ Tip: set Focus/Short = 1 min, Long = 2, "Long break after" = 2 in Settings for a
 - [ ] Reload → sessions and settings persist
 - [ ] DevTools → corrupt `pomodoro.v1.sessions` → page still loads with 0 stats, no errors
 - [ ] Dark mode and ~360px width look correct
+
+Settings rows and theme:
+- [ ] All three rows start closed; opening one closes the other; chevron flips; keyboard Enter/Space toggles a row
+- [ ] Row summaries match saved settings (e.g. "50 / 10 / 20 min · long break every 3", "Blocking 3 sites during focus")
+      and do not change until Save
+- [ ] Invalid value in a closed row → Save opens that row and focuses the field
+- [ ] Data → Clear focus history: Cancel keeps everything; OK empties stats/chart and the summary says "0 focus sessions saved"
+- [ ] Sky scene: clouds drift, petals fall; dark mode shows stars + moon; OS "reduce motion" freezes the scene
+- [ ] Glass cards stay readable over the sky in light and dark mode
+
+Site blocking (load the extension unpacked first; use `example.com` / `example.org` as test sites):
+- [ ] Extension page: "install as extension" note hidden; toolbar icon opens/focuses the timer tab
+- [ ] `file://` page: note shown, no blocking, no console errors
+- [ ] Blocklist `example.com` + start focus → status "Blocking 1 site"; `example.com` and `sub.example.com` show
+      the "Stay focused" page; `example.org` loads
+- [ ] A tab already open on `example.com` switches to the blocked page when focus starts
+- [ ] Pause → status disappears, `example.com` loads; resume → blocked again
+- [ ] Focus ends → break: nothing blocked; next focus → blocked again; Reset → nothing blocked
+- [ ] Allowlist `example.com` → `example.org` blocked; `example.com`, `docs.example.com` and the timer itself load
+- [ ] Editing the site list or switching mode to Off mid-focus applies immediately
+- [ ] "Back to timer" on the blocked page opens the timer and does NOT end blocking
+- [ ] Close the timer tab mid-focus → still blocked until the session's end time, then unblocked
+- [ ] Blocked page shows the sky scene and "集中しよう！ Stay focused" card in light and dark mode
+
+Known behaviour: the timer itself is not persisted, so reloading the timer tab mid-focus shows an idle
+timer while blocking continues until that session's original end time (the background alarm ends it).
 
 ## Workflow
 Implement one phase at a time and stop after each phase for review.

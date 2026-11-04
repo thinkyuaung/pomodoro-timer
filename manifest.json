@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Pomodoro Focus Timer",
+  "version": "1.0.0",
+  "description": "Pomodoro timer with stats that blocks distracting sites during focus sessions.",
+  "permissions": ["declarativeNetRequest", "alarms", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "js/background.js"
+  },
+  "action": {
+    "default_title": "Open Pomodoro timer"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["blocked.html", "css/style.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

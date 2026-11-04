@@ -7,14 +7,44 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <!-- Decorative anime sky scene (CSS + inline SVG only) -->
+  <div class="scene" aria-hidden="true">
+    <div class="stars"></div>
+    <div class="sun"></div>
+    <div class="cloud"></div>
+    <div class="cloud"></div>
+    <div class="cloud"></div>
+    <div class="cloud"></div>
+    <svg class="hills" viewBox="0 0 1440 320" preserveAspectRatio="none" focusable="false">
+      <path class="hill hill-far"  d="M0 190 C 240 110 420 150 640 165 C 860 180 1080 100 1440 140 L1440 320 L0 320 Z"/>
+      <path class="hill hill-mid"  d="M0 240 C 200 190 380 205 560 228 C 760 255 980 185 1200 205 C 1300 214 1380 226 1440 222 L1440 320 L0 320 Z"/>
+      <path class="hill hill-near" d="M0 282 C 220 250 460 268 720 284 C 980 300 1200 258 1440 270 L1440 320 L0 320 Z"/>
+    </svg>
+    <div class="petals">
+      <span class="petal"></span><span class="petal"></span><span class="petal"></span>
+      <span class="petal"></span><span class="petal"></span><span class="petal"></span>
+      <span class="petal"></span><span class="petal"></span><span class="petal"></span>
+      <span class="petal"></span><span class="petal"></span><span class="petal"></span>
+    </div>
+  </div>
+
   <main class="app" data-mode="focus">
     <!-- Header -->
     <header class="card app-header">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true"></span>
+        <svg class="brand-mark" viewBox="-20 -20 40 40" aria-hidden="true" focusable="false">
+          <g class="sakura-petals">
+            <ellipse rx="6.5" ry="10" cy="-9"/>
+            <ellipse rx="6.5" ry="10" cy="-9" transform="rotate(72)"/>
+            <ellipse rx="6.5" ry="10" cy="-9" transform="rotate(144)"/>
+            <ellipse rx="6.5" ry="10" cy="-9" transform="rotate(216)"/>
+            <ellipse rx="6.5" ry="10" cy="-9" transform="rotate(288)"/>
+          </g>
+          <circle class="sakura-center" r="3.5"/>
+        </svg>
         <div>
           <h1>Pomodoro</h1>
-          <p class="brand-sub">Focus timer with stats &amp; site blocking</p>
+          <p class="brand-sub"><span lang="ja">集中タイマー</span> · Focus timer</p>
         </div>
       </div>
     </header>
@@ -72,70 +102,115 @@
       </div>
     </section>
 
-    <!-- Settings -->
+    <!-- Settings: browser-style expandable rows (one open at a time via details[name]) -->
     <section class="card settings" aria-labelledby="settings-heading">
       <h2 id="settings-heading" class="card-title">Settings</h2>
 
       <form id="settingsForm" class="settings-form" novalidate>
-        <!-- Durations -->
-        <fieldset class="panel">
-          <legend class="panel-title">Durations</legend>
-          <div class="fields">
-            <label class="field">
-              <span>Focus (min)</span>
-              <input type="number" name="focus" min="1" max="120" step="1" value="25" required>
-            </label>
-            <label class="field">
-              <span>Short break (min)</span>
-              <input type="number" name="short" min="1" max="120" step="1" value="5" required>
-            </label>
-            <label class="field">
-              <span>Long break (min)</span>
-              <input type="number" name="long" min="1" max="120" step="1" value="15" required>
-            </label>
-            <label class="field">
-              <span>Long break after (sessions)</span>
-              <input type="number" name="longEvery" min="1" max="12" step="1" value="4" required>
-            </label>
+        <div class="setting-rows">
+
+          <!-- Row 1: durations -->
+          <details class="setting-row" name="settings">
+            <summary>
+              <span class="row-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">Timer durations</span>
+                <span id="durationsSummary" class="row-summary">25 / 5 / 15 min · long break every 4</span>
+              </span>
+              <span class="row-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="row-body">
+              <div class="fields">
+                <label class="field">
+                  <span>Focus (min)</span>
+                  <input type="number" name="focus" min="1" max="120" step="1" value="25" required>
+                </label>
+                <label class="field">
+                  <span>Short break (min)</span>
+                  <input type="number" name="short" min="1" max="120" step="1" value="5" required>
+                </label>
+                <label class="field">
+                  <span>Long break (min)</span>
+                  <input type="number" name="long" min="1" max="120" step="1" value="15" required>
+                </label>
+                <label class="field">
+                  <span>Long break after (sessions)</span>
+                  <input type="number" name="longEvery" min="1" max="12" step="1" value="4" required>
+                </label>
+              </div>
+              <p class="hint">Duration changes apply from the next session if the timer is running.</p>
+            </div>
+          </details>
+
+          <!-- Row 2: site blocking -->
+          <details class="setting-row" name="settings">
+            <summary>
+              <span class="row-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M5.7 5.7l12.6 12.6"/></svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">Site blocking <span class="badge">focus only</span></span>
+                <span id="blockingSummary" class="row-summary">Off</span>
+              </span>
+              <span class="row-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="row-body">
+              <div class="segmented" role="radiogroup" aria-label="Blocking mode">
+                <label><input type="radio" name="blockMode" value="off" checked><span>Off</span></label>
+                <label><input type="radio" name="blockMode" value="blocklist"><span>Block listed</span></label>
+                <label><input type="radio" name="blockMode" value="allowlist"><span>Allow only listed</span></label>
+              </div>
+
+              <p id="modeHint" class="hint">Blocking is off. All sites are allowed during focus.</p>
+
+              <label class="field site-list" data-for-mode="blocklist" hidden>
+                <span>Disallowed sites <small>(one per line)</small></span>
+                <textarea name="blockedSites" rows="5" spellcheck="false" autocapitalize="off"
+                          placeholder="youtube.com&#10;reddit.com&#10;x.com"></textarea>
+              </label>
+
+              <label class="field site-list" data-for-mode="allowlist" hidden>
+                <span>Allowed sites <small>(one per line)</small></span>
+                <textarea name="allowedSites" rows="5" spellcheck="false" autocapitalize="off"
+                          placeholder="docs.google.com&#10;github.com&#10;stackoverflow.com"></textarea>
+              </label>
+
+              <p id="blockerNote" class="note">
+                Sites are only blocked when this app is installed as a browser extension
+                (Chrome/Edge → Extensions → Developer mode → Load unpacked).
+              </p>
+            </div>
+          </details>
+
+          <!-- Row 3: data -->
+          <details class="setting-row" name="settings">
+            <summary>
+              <span class="row-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/></svg>
+              </span>
+              <span class="row-text">
+                <span class="row-title">Data</span>
+                <span id="dataSummary" class="row-summary">0 focus sessions saved</span>
+              </span>
+              <span class="row-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="row-body">
+              <p class="hint">Your focus history is stored only in this browser. Clearing it cannot be undone.</p>
+              <div>
+                <button type="button" id="clearHistory" class="btn btn-danger">Clear focus history</button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <div class="settings-footer">
+          <p id="settingsError" class="form-error" role="alert"></p>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save settings</button>
+            <button type="button" id="restoreDefaults" class="btn">Restore defaults</button>
           </div>
-          <p class="hint">Duration changes apply from the next session if the timer is running.</p>
-        </fieldset>
-
-        <!-- Site blocking -->
-        <fieldset class="panel">
-          <legend class="panel-title">Site blocking <span class="badge">focus only</span></legend>
-
-          <div class="segmented" role="radiogroup" aria-label="Blocking mode">
-            <label><input type="radio" name="blockMode" value="off" checked><span>Off</span></label>
-            <label><input type="radio" name="blockMode" value="blocklist"><span>Block listed</span></label>
-            <label><input type="radio" name="blockMode" value="allowlist"><span>Allow only listed</span></label>
-          </div>
-
-          <p id="modeHint" class="hint">Blocking is off. All sites are allowed during focus.</p>
-
-          <label class="field site-list" data-for-mode="blocklist" hidden>
-            <span>Disallowed sites <small>(one per line)</small></span>
-            <textarea name="blockedSites" rows="5" spellcheck="false" autocapitalize="off"
-                      placeholder="youtube.com&#10;reddit.com&#10;x.com"></textarea>
-          </label>
-
-          <label class="field site-list" data-for-mode="allowlist" hidden>
-            <span>Allowed sites <small>(one per line)</small></span>
-            <textarea name="allowedSites" rows="5" spellcheck="false" autocapitalize="off"
-                      placeholder="docs.google.com&#10;github.com&#10;stackoverflow.com"></textarea>
-          </label>
-
-          <p id="blockerNote" class="note">
-            Sites are only blocked when this app is installed as a browser extension
-            (Chrome/Edge → Extensions → Developer mode → Load unpacked).
-          </p>
-        </fieldset>
-
-        <p id="settingsError" class="form-error" role="alert"></p>
-
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Save settings</button>
-          <button type="button" id="restoreDefaults" class="btn">Restore defaults</button>
         </div>
       </form>
     </section>
@@ -144,6 +219,7 @@
   <script defer src="js/storage.js"></script>
   <script defer src="js/timer.js"></script>
   <script defer src="js/stats.js"></script>
+  <script defer src="js/blocker.js"></script>
   <script defer src="js/app.js"></script>
 </body>
 </html>
