@@ -385,7 +385,9 @@
       renderMode(state);
       renderStats(); // also keeps "today" correct after midnight
       beep();
-      announce(`${MODE_NAMES[state.mode]} started.`);
+      announce(state.mode === 'focus'
+        ? 'Focus started.'
+        : `Focus complete. ${MODE_NAMES[state.mode]} is ready — press Start when you are.`);
     },
 
     onFocusComplete(durationMin) {

@@ -5,6 +5,7 @@
  *   isAvailable()                     → true only when the page runs inside the extension
  *   apply({ mode, sites, endTime })   → Promise<boolean>  block sites until endTime (ms epoch)
  *   clear()                           → Promise<boolean>  remove blocking
+ *   openTimer()                       → Promise<boolean>  (blocked page) switch to the running timer tab
  *
  * When opened as a plain page (file://), every call is a harmless no-op that resolves false.
  */
@@ -41,5 +42,9 @@ const SiteBlocker = (() => {
     return send({ type: 'clear' });
   }
 
-  return Object.freeze({ isAvailable, apply, clear });
+  function openTimer() {
+    return send({ type: 'open-timer' });
+  }
+
+  return Object.freeze({ isAvailable, apply, clear, openTimer });
 })();

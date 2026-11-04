@@ -12,7 +12,8 @@ and (when installed as a Chrome/Edge extension) blocks distracting websites duri
 - No backend — everything runs in the browser; data persists in `localStorage`
 - No external libraries, CDNs, or npm packages (no build step, no `package.json`)
 - All storage code lives in `js/storage.js` — no other file may call `localStorage` directly
-- Only `js/app.js` touches the DOM; `timer.js`, `stats.js` and `blocker.js` are pure logic
+- Only `js/app.js` (timer page) and `js/blocked.js` (blocked page) touch the DOM; `timer.js`, `stats.js` and
+  `blocker.js` have no DOM access
 - `chrome.*` extension APIs are used only in `js/blocker.js` (page side) and `js/background.js` (service worker)
 - `js/background.js` keeps no persistent state: only session blocking rules + one `chrome.alarms` alarm
 - The app must keep working as a plain page opened from `file://`; blocking is then simply unavailable
@@ -21,20 +22,23 @@ and (when installed as a Chrome/Edge extension) blocks distracting websites duri
 ## Structure
 ```
 index.html        Markup only: decorative pastel scene + one-screen app; loads the scripts in order
-blocked.html      Static "blocked during focus" page (same pastel scene, no scripts)
+blocked.html      "Blocked during focus" page (same pastel scene); loads only blocker.js + blocked.js
 manifest.json     Manifest V3 extension definition (permissions, background worker, toolbar action)
 css/style.css     Theme tokens, pastel scene, glass cards, progress ring, settings drop-down, chart, blocked page
 js/storage.js     AppStorage object: settings (incl. site lists) + session history in localStorage
 js/timer.js       Timer object: countdown engine and focus/break mode switching
 js/stats.js       Stats object: pure calculations over saved sessions
-js/blocker.js     SiteBlocker object: sends block/clear messages to the extension background
-js/background.js  Extension service worker: applies/removes blocking rules, opens the timer tab
+js/blocker.js     SiteBlocker object: sends block/clear/open-timer messages to the extension background
+js/background.js  Extension service worker: applies/removes blocking rules, finds/focuses the timer tab
+js/blocked.js     Blocked page only: "Back to timer" switches to the running timer tab (link fallback)
 js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders everything
 ```
 
 ## Features
 - Start, pause, reset
 - Auto switch: focus (25 min) → short break (5 min); long break (15 min) after every 4 focus sessions
+  - When focus ends, the break is loaded but **waits for Start** (no auto-start)
+  - When a break ends, the next focus session **starts automatically**
 - Save each completed focus session: `{ date: "YYYY-MM-DD" (local), completedAt: ISO string, durationMin }`
 - Stats: sessions today, total focus time, daily (last 7 days) and weekly (last 8 weeks) history as CSS bars
 - Settings live in a **drop-down card** opened by the ⚙ button (top right); it closes on ⚙, ✕, Esc
@@ -51,11 +55,13 @@ js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders
   - Active **only while a focus session is running** — paused, idle and breaks are unblocked
   - Changes to site settings apply immediately (durations still apply from the next session)
   - Rules end automatically at the focus session's end time, even if the timer tab is closed
+  - Blocked page "Back to timer" returns to the running timer tab (most recently used one) and closes the
+    blocked tab; if no timer tab is open, the blocked tab becomes the timer
 
 ## Conventions
 - Scripts load with `<script defer>` in dependency order: `storage.js` → `timer.js` → `stats.js` → `blocker.js` → `app.js`
 - Each page-side JS file exposes exactly one global object: `AppStorage`, `Timer`, `Stats`, `SiteBlocker`;
-  `app.js` and `background.js` expose nothing
+  `app.js`, `blocked.js` and `background.js` expose nothing
   (not `Storage` — that name is the browser's built-in `window.Storage` interface)
 - Timer accuracy: compute remaining time from an `endTime` timestamp, never by counting ticks
 - Wrap every `localStorage` read/write in `try/catch` and fall back to defaults
@@ -96,7 +102,8 @@ js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders
 Tip: set Focus/Short = 1 min, Long = 2, "Long break after" = 2 in Settings for a fast cycle.
 - [ ] First load: 25:00, Focus, "Session 1 of 4", stats 0 / 0m, empty-chart message, tab title "25:00 – Focus"
 - [ ] Start counts down; Pause holds the time (also after switching tabs and coming back)
-- [ ] Focus ends → beep, short break auto-starts, "Sessions today" +1, today's bar grows
+- [ ] Focus ends → beep, Short Break shown at full time but stopped (button says Start), "Sessions today" +1,
+      today's bar grows; pressing Start runs the break; when the break ends, focus starts automatically
 - [ ] After N focus sessions → long break; after long break → "Session 1 of N"
 - [ ] Reset mid-focus → full time, stopped, nothing saved
 - [ ] Settings: invalid values (0, empty, 121) show errors and highlight fields; nothing saved
@@ -130,7 +137,9 @@ Site blocking (load the extension unpacked first; use `example.com` / `example.o
 - [ ] Focus ends → break: nothing blocked; next focus → blocked again; Reset → nothing blocked
 - [ ] Allowlist `example.com` → `example.org` blocked; `example.com`, `docs.example.com` and the timer itself load
 - [ ] Editing the site list or switching mode to Off mid-focus applies immediately
-- [ ] "Back to timer" on the blocked page opens the timer and does NOT end blocking
+- [ ] "Back to timer" on the blocked page switches to the **already running** timer tab (countdown continues),
+      closes the blocked tab, does NOT open a second timer and does NOT end blocking
+- [ ] With no timer tab open, "Back to timer" turns the blocked tab itself into the timer
 - [ ] Close the timer tab mid-focus → still blocked until the session's end time, then unblocked
 - [ ] Blocked page shows the pastel scene and "集中しよう！ Stay focused" card in light and dark mode
 

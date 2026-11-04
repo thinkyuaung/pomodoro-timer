@@ -132,8 +132,13 @@ const Timer = (() => {
         onFocusComplete(durationMs / MS_PER_MIN, getState());
       }
 
-      setMode(nextMode());
-      start(); // auto-start the next session
+      const next = nextMode();
+      setMode(next);
+      if (next === 'focus') {
+        start();          // break over → next focus session starts automatically
+      } else {
+        emitTick(true);   // focus over → break is ready but waits for Start
+      }
     }
 
     function tick() {

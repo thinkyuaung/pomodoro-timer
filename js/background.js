@@ -9,6 +9,7 @@
  * Messages (from js/blocker.js):
  *   { type: 'block', mode: 'blocklist' | 'allowlist', sites: string[], endTime: number }
  *   { type: 'clear' }
+ *   { type: 'open-timer' }   (from blocked.html: go back to the running timer tab)
  */
 'use strict';
 
@@ -83,14 +84,38 @@ async function redirectOpenTabs(mode, sites) {
 
 // ---------- open the timer ----------
 
+/** The most recently used timer tab, ignoring `excludeTabId` (e.g. the blocked tab itself). */
+async function findTimerTab(excludeTabId) {
+  const timerUrl = chrome.runtime.getURL(TIMER_PAGE);
+  const tabs = await chrome.tabs.query({});
+  return tabs
+    .filter((tab) => tab.id !== excludeTabId && tab.url && tab.url.startsWith(timerUrl))
+    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
+}
+
+async function focusTab(tab) {
+  await chrome.tabs.update(tab.id, { active: true });
+  await chrome.windows.update(tab.windowId, { focused: true });
+}
+
+/** Toolbar icon: switch to the open timer, or open one. */
 async function openTimer() {
-  const url = chrome.runtime.getURL(TIMER_PAGE);
-  const [existing] = await chrome.tabs.query({ url });
+  const existing = await findTimerTab();
+  if (existing) await focusTab(existing);
+  else await chrome.tabs.create({ url: chrome.runtime.getURL(TIMER_PAGE) });
+}
+
+/**
+ * "Back to timer" on the blocked page: switch to the running timer and close the blocked tab;
+ * if no timer is open, turn the blocked tab itself into the timer (never a second timer).
+ */
+async function returnToTimer(blockedTab) {
+  const existing = await findTimerTab(blockedTab.id);
   if (existing) {
-    await chrome.tabs.update(existing.id, { active: true });
-    await chrome.windows.update(existing.windowId, { focused: true });
+    await focusTab(existing);
+    await chrome.tabs.remove(blockedTab.id);
   } else {
-    await chrome.tabs.create({ url });
+    await chrome.tabs.update(blockedTab.id, { url: chrome.runtime.getURL(TIMER_PAGE) });
   }
 }
 
@@ -102,6 +127,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   let task;
   if (msg.type === 'block') task = applyBlocking(msg);
   else if (msg.type === 'clear') task = clearBlocking();
+  else if (msg.type === 'open-timer' && sender.tab) task = returnToTimer(sender.tab);
   else return false;
 
   task.then(
