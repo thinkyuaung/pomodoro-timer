@@ -1,7 +1,9 @@
 /**
- * stats.js — pure calculations over saved sessions. No DOM, no storage access.
+ * stats.js — pure calculations over saved sessions. No DOM; never reads or writes storage.
  *
  * Exposes one global: Stats
+ * Depends on: AppStorage.toDateKey (storage.js loads first) — the single source of the
+ * "YYYY-MM-DD" format, so saved session dates and chart buckets can never disagree.
  *
  * Input: sessions = [{ date: "YYYY-MM-DD" (local), completedAt, durationMin }]
  * Every function that depends on "today" takes an optional `now` (Date) for testing.
@@ -9,18 +11,12 @@
 const Stats = (() => {
   // ---------- date helpers (local time) ----------
 
-  /** Same format as AppStorage.toDateKey: "YYYY-MM-DD" in local time. */
-  function toDateKey(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
+  const toDateKey = AppStorage.toDateKey;
 
   /** "YYYY-MM-DD" → local midnight Date. */
   function fromDateKey(key) {
-    const [y, m, d] = key.split('-').map(Number);
-    return new Date(y, m - 1, d);
+    const [year, month, day] = key.split('-').map(Number);
+    return new Date(year, month - 1, day);
   }
 
   function startOfDay(date) {
@@ -146,7 +142,6 @@ const Stats = (() => {
   }
 
   return Object.freeze({
-    toDateKey,
     sessionsToday,
     focusMinutesToday,
     totalFocusMinutes,

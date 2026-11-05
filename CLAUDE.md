@@ -18,6 +18,9 @@ and (when installed as a Chrome/Edge extension) blocks distracting websites duri
 - `js/background.js` keeps no persistent state: only session blocking rules + one `chrome.alarms` alarm
 - The app must keep working as a plain page opened from `file://`; blocking is then simply unavailable
 - No inline scripts or `onclick` attributes (extension pages forbid them via CSP)
+-Use meaningful variable names
+-Keep functions small and readale
+
 
 ## Structure
 ```
@@ -27,7 +30,7 @@ manifest.json     Manifest V3 extension definition (permissions, background work
 css/style.css     Theme tokens, pastel scene, glass cards, progress ring, settings drop-down, chart, blocked page
 js/storage.js     AppStorage object: settings (incl. site lists) + session history in localStorage
 js/timer.js       Timer object: countdown engine and focus/break mode switching
-js/stats.js       Stats object: pure calculations over saved sessions
+js/stats.js       Stats object: pure calculations over saved sessions (uses AppStorage.toDateKey)
 js/blocker.js     SiteBlocker object: sends block/clear/open-timer messages to the extension background
 js/background.js  Extension service worker: applies/removes blocking rules, finds/focuses the timer tab
 js/blocked.js     Blocked page only: "Back to timer" switches to the running timer tab (link fallback)
@@ -89,7 +92,12 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
   `index.html` and `blocked.html` contain the same scene markup — keep them in sync
 - Cards are frosted glass (`--glass`, `--glass-strong` + `backdrop-filter`); accents: violet `--primary`,
   sakura pink `--sakura`; mode colors focus lavender / short mint / long sky; buttons use a violet → pink gradient
-- Colors are CSS custom properties on `:root`, redefined in the dark-mode media query — never hard-code colors in rules
+- Colors are CSS custom properties on `:root`, redefined in the dark-mode media query — never hard-code colors in rules.
+  This includes glows, tints and gradients (`--gradient-brand`, `--gradient-text`, `--icon-tint`, `--btn-glow`, …);
+  the only literal allowed outside `:root` is `black` in the progress-ring `mask` (alpha, not a visible color)
+- Reuse instead of copying: gradient headings/numbers use the `.gradient-text` class; violet → pink fills use
+  `var(--gradient-brand)`; one date-key helper (`AppStorage.toDateKey`); one `plural()` and one
+  `blockingPhrase()` in `app.js`; saved/restored settings go through `applySettings()`
 - Animate only `transform`/`opacity`; `prefers-reduced-motion: reduce` stops every animation and hides petals
 
 ## Running

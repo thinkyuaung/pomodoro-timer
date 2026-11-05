@@ -91,7 +91,9 @@ function fakeLocalStorage() {
 // ---------------------------------------------------------------- stats.js
 {
   console.log('\n# stats.js');
-  const St = load('stats.js', 'Stats');
+  // stats.js uses AppStorage.toDateKey, so load storage.js first — same order as index.html
+  const storageForStats = load('storage.js', 'AppStorage', { localStorage: fakeLocalStorage().api });
+  const St = load('stats.js', 'Stats', { AppStorage: storageForStats });
   const now = new Date(2026, 10, 3, 14, 0); // Tue 3 Nov 2026
   const s = (date, min = 25) => ({ date, completedAt: 'x', durationMin: min });
   const data = [s('2026-11-03'), s('2026-11-03'), s('2026-11-02', 50), s('2026-11-01'), s('2026-10-26'), s('2026-10-20', 30), s('2026-08-01')];

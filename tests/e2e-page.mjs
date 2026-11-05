@@ -1,22 +1,16 @@
 // Page e2e suite: drives index.html (file://) in headless Chrome via the DevTools protocol
 // (Node 22+ built-in WebSocket). Date.now is skewed from the test so minutes pass instantly.
 // Run: node tests/e2e-page.mjs
-import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 
-import { findBrowser, PROJECT_DIR, tempProfile } from './helpers.mjs';
+import { findBrowser, launchBrowser, PROJECT_DIR, tempProfile } from './helpers.mjs';
 
 const browser = findBrowser('chrome');
 const projectDir = PROJECT_DIR;
 const profileDir = tempProfile('page');
 const pageUrl = pathToFileURL(path.join(projectDir, 'index.html')).href;
-const PORT = 9333;
-
-const proc = spawn(browser, [
-  '--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profileDir}`,
-  '--no-first-run', '--allow-file-access-from-files', 'about:blank',
-], { stdio: 'ignore' });
+const { port: PORT, close: closeBrowser } = await launchBrowser(browser, profileDir, ['--allow-file-access-from-files']);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let target;
@@ -230,6 +224,6 @@ check((await ev(`getComputedStyle(document.querySelector('.petal')).animationNam
 
 check(errors.length === 0, 'no console errors / exceptions', errors.join(' | '));
 
-ws.close(); proc.kill();
+ws.close(); await closeBrowser();
 console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED');
 process.exit(failed ? 1 : 0);

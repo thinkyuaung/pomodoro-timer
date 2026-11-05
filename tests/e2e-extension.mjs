@@ -1,19 +1,17 @@
 // Extension e2e suite: loads the project unpacked in headless Edge and checks real site blocking.
 // (Current Chrome ignores --load-extension, so this suite needs Edge.) Takes ~2 min (one real-time alarm test).
 // Run: node tests/e2e-extension.mjs
-import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { findBrowser, OUTPUT_DIR, PROJECT_DIR, tempProfile } from './helpers.mjs';
+import { findBrowser, launchBrowser, OUTPUT_DIR, PROJECT_DIR, tempProfile } from './helpers.mjs';
 
 const browser = findBrowser('edge');
 const ext = PROJECT_DIR;
 const profile = tempProfile('ext');
 const outDir = OUTPUT_DIR;
-const PORT = 9441;
-const proc = spawn(browser, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`,
-  '--no-first-run', `--disable-extensions-except=${ext}`, `--load-extension=${ext}`, 'about:blank'], { stdio: 'ignore' });
+const { port: PORT, close: closeBrowser } = await launchBrowser(browser, profile,
+  [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- find extension + connect to the browser endpoint ----
@@ -25,7 +23,7 @@ for (let i = 0; i < 40 && !swInfo; i++) {
     browserWs = (await (await fetch(`http://127.0.0.1:${PORT}/json/version`)).json()).webSocketDebuggerUrl;
   } catch {}
 }
-if (!swInfo) { console.log('extension service worker not found'); proc.kill(); process.exit(1); }
+if (!swInfo) { console.log('FAIL  extension service worker not found'); await closeBrowser(); process.exit(1); }
 const EXT = swInfo.url.match(/^chrome-extension:\/\/[a-z]+/)[0];
 const BLOCKED = `${EXT}/blocked.html`;
 console.log('extension:', EXT);
@@ -227,6 +225,6 @@ check(!(await visit('https://example.com/')), 'after alarm: example.com allowed'
 await closeOpened();
 
 check(errors.length === 0, 'no console errors / exceptions', errors.join(' | '));
-ws.close(); proc.kill();
+ws.close(); await closeBrowser();
 console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED');
 process.exit(failed ? 1 : 0);

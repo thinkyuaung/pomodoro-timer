@@ -112,12 +112,18 @@
     return `${n} ${word}${n === 1 ? '' : 's'}`;
   }
 
+  /** "Blocking 3 sites" / "Only 2 sites allowed" — shared by the settings summary and the timer status. */
+  function blockingPhrase(mode, siteCount) {
+    return mode === 'blocklist'
+      ? `Blocking ${plural(siteCount, 'site')}`
+      : `Only ${plural(siteCount, 'site')} allowed`;
+  }
+
   function blockingSummaryText(settings) {
     const { blockMode, blockedSites, allowedSites } = settings;
     if (blockMode === 'off') return 'Off';
-    const text = blockMode === 'blocklist'
-      ? `Blocking ${plural(blockedSites.length, 'site')} during focus`
-      : `Only ${plural(allowedSites.length, 'site')} allowed during focus`;
+    const sites = blockMode === 'blocklist' ? blockedSites : allowedSites;
+    const text = `${blockingPhrase(blockMode, sites.length)} during focus`;
     return SiteBlocker.isAvailable() ? text : `${text} · needs the extension`;
   }
 
@@ -177,8 +183,7 @@
     for (const d of data) {
       const col = document.createElement('div');
       col.className = 'bar-col' + (d.isCurrent ? ' is-current' : '');
-      const sessionWord = d.count === 1 ? 'session' : 'sessions';
-      col.title = `${d.title}: ${d.count} ${sessionWord}, ${Stats.formatMinutes(d.minutes)}`;
+      col.title = `${d.title}: ${plural(d.count, 'session')}, ${Stats.formatMinutes(d.minutes)}`;
 
       const value = document.createElement('span');
       value.className = 'bar-value';
@@ -318,24 +323,27 @@
       revealField(result.invalidFields[0]); // never leave an error hidden in a closed row
       return;
     }
-    fillForm(result.settings); // show normalized sites (e.g. "https://www.x.com/a" → "x.com")
-    currentSettings = result.settings;
-    renderSettingSummaries();
-    const appliedNow = timer.updateSettings(result.settings);
+    const appliedNow = applySettings(result.settings); // form shows normalized sites ("https://www.x.com/a" → "x.com")
     showFormMessage(appliedMessage(appliedNow || !durationsChanged(before, result.settings)), true);
-    renderMode(timer.getState());
-    syncBlocking(timer.getState()); // site settings apply immediately
   }
 
   function onRestoreDefaults() {
-    const defaults = AppStorage.resetSettings();
-    fillForm(defaults);
-    currentSettings = defaults;
-    renderSettingSummaries();
-    const appliedNow = timer.updateSettings(defaults);
+    const appliedNow = applySettings(AppStorage.resetSettings());
     showFormMessage(appliedMessage(appliedNow).replace('Saved', 'Defaults restored'), true);
+  }
+
+  /**
+   * Makes freshly saved settings live everywhere: form, summaries, timer and site blocking.
+   * @returns {boolean} true if the new durations applied to the timer immediately
+   */
+  function applySettings(settings) {
+    fillForm(settings);
+    currentSettings = settings;
+    renderSettingSummaries();
+    const appliedNow = timer.updateSettings(settings);
     renderMode(timer.getState());
-    syncBlocking(timer.getState());
+    syncBlocking(timer.getState()); // site settings apply immediately
+    return appliedNow;
   }
 
   // ---------- site blocking ----------
@@ -349,16 +357,10 @@
     return null;
   }
 
-  function blockStatusText(block) {
-    const n = block.sites.length;
-    const sites = n === 1 ? 'site' : 'sites';
-    return block.mode === 'blocklist' ? `Blocking ${n} ${sites}` : `Only ${n} ${sites} allowed`;
-  }
-
   function renderBlockStatus(block) {
     const show = block !== null && SiteBlocker.isAvailable();
     els.blockStatus.hidden = !show;
-    els.blockStatus.textContent = show ? blockStatusText(block) : '';
+    els.blockStatus.textContent = show ? blockingPhrase(block.mode, block.sites.length) : '';
   }
 
   /** Sends apply/clear to the extension only when the desired blocking actually changes. */
