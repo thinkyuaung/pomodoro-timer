@@ -32,6 +32,7 @@ js/blocker.js     SiteBlocker object: sends block/clear/open-timer messages to t
 js/background.js  Extension service worker: applies/removes blocking rules, finds/focuses the timer tab
 js/blocked.js     Blocked page only: "Back to timer" switches to the running timer tab (link fallback)
 js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders everything
+tests/            Dev-only test scripts (never loaded by the app) — see Testing
 ```
 
 ## Features
@@ -97,6 +98,21 @@ js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders
   Load unpacked → select this project folder → click the extension's toolbar icon to open the timer.
   After editing files, press the reload button on the extension card.
 - The two ways of running have **separate** `localStorage` (different origins), so stats/settings are not shared.
+
+## Testing
+Automated tests use **Node 22+ built-ins only** (no npm, no `package.json`) and drive real browsers through the
+Chrome DevTools protocol. Run from the project root:
+```
+node tests/unit.mjs            # storage.js, stats.js, timer.js in Node (fake clock)       ~1 s
+node tests/e2e-page.mjs        # index.html via file:// in headless Chrome (or Edge)     ~30 s
+node tests/e2e-extension.mjs   # loads the extension unpacked in headless Edge            ~2 min
+```
+- Each prints PASS/FAIL per check and exits non-zero on any failure; run all three before committing
+- Browsers are found automatically; override with `CHROME_PATH` / `EDGE_PATH`
+- The extension suite needs **Edge** (current Chrome ignores `--load-extension`) and includes one real-time
+  (~60 s) alarm check; it skips the "Back to timer" checks if that button is commented out in `blocked.html`
+- Screenshots go to `tests/output/` (git-ignored); browser profiles are throw-away folders in the OS temp dir
+- When behaviour changes, update the matching checks in the same commit
 
 ## Manual test checklist
 Tip: set Focus/Short = 1 min, Long = 2, "Long break after" = 2 in Settings for a fast cycle.
