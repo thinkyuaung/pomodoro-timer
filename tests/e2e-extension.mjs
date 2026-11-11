@@ -107,11 +107,15 @@ check(msg === 'Saved.', 'blocklist settings saved', msg);
 
 const { targetId: preTab } = await send('Target.createTarget', { url: 'https://example.com/already-open' });
 opened.push(preTab); await sleep(1000);
+// Wait until example.com has really loaded: while loading, tab.url is still empty (only pendingUrl is set)
+const preTabLoaded = () => evalIn(swSession, `chrome.tabs.query({}).then(t => t.some(x => x.status === 'complete' && (x.url || '').includes('example.com/already-open')))`);
+for (let waited = 0; waited < 10000 && !(await preTabLoaded()); waited += 200) await sleep(200);
 check(!(await urlOf(preTab)).startsWith(BLOCKED), 'pre-open tab not blocked before focus');
 
 await click('#startPause'); await sleep(1200);
 check((await status()) === 'Blocking 1 site', 'status line while focus runs', await status());
 check((await rules()) === 1 && (await alarm()) !== null, 'session rule + end alarm created');
+for (let waited = 0; waited < 3000 && !(await urlOf(preTab)).startsWith(BLOCKED); waited += 100) await sleep(100); // redirect can lag under load
 check((await urlOf(preTab)).startsWith(BLOCKED), 'already-open example.com tab redirected to blocked page', await urlOf(preTab));
 check(await visit('https://example.com/'), 'blocklist: example.com blocked');
 check(await visit('https://sub.example.com/page'), 'blocklist: sub.example.com blocked');

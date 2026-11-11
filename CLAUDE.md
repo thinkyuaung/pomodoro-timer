@@ -1,7 +1,8 @@
 # Pomodoro Timer with Stats
 
-A browser-based Pomodoro timer that records completed focus sessions, shows usage stats,
-and (when installed as a Chrome/Edge extension) blocks distracting websites during focus sessions.
+A browser-based Pomodoro timer that records completed focus sessions, shows usage stats, rewards focus with
+a growing **Sakura Garden** plus smart messages, and (when installed as a Chrome/Edge extension) blocks
+distracting websites during focus sessions.
 
 ## Stack
 - HTML5, CSS3, vanilla JavaScript (ES2015+) only
@@ -12,29 +13,30 @@ and (when installed as a Chrome/Edge extension) blocks distracting websites duri
 - No backend — everything runs in the browser; data persists in `localStorage`
 - No external libraries, CDNs, or npm packages (no build step, no `package.json`)
 - All storage code lives in `js/storage.js` — no other file may call `localStorage` directly
-- Only `js/app.js` (timer page) and `js/blocked.js` (blocked page) touch the DOM; `timer.js`, `stats.js` and
-  `blocker.js` have no DOM access
+- Only `js/app.js` (timer page) and `js/blocked.js` (blocked page) touch the DOM; `timer.js`, `stats.js`,
+  `garden.js` and `blocker.js` have no DOM access
 - `chrome.*` extension APIs are used only in `js/blocker.js` (page side) and `js/background.js` (service worker)
 - `js/background.js` keeps no persistent state: only session blocking rules + one `chrome.alarms` alarm
 - The app must keep working as a plain page opened from `file://`; blocking is then simply unavailable
 - No inline scripts or `onclick` attributes (extension pages forbid them via CSP)
--Use meaningful variable names
--Keep functions small and readale
+- Use meaningful variable names
+- Keep functions small and readable
 
 
 ## Structure
 ```
-index.html        Markup only: decorative pastel scene + one-screen app; loads the scripts in order
+index.html        Markup only: pastel scene, plant SVG sprite, one-screen app; loads the scripts in order
 blocked.html      "Blocked during focus" page (same pastel scene); loads only blocker.js + blocked.js
 manifest.json     Manifest V3 extension definition (permissions, background worker, toolbar action)
-css/style.css     Theme tokens, pastel scene, glass cards, progress ring, settings drop-down, chart, blocked page
-js/storage.js     AppStorage object: settings (incl. site lists) + session history in localStorage
+css/style.css     Theme tokens, pastel scene, glass cards, progress ring, plants/garden, settings drop-down, chart, blocked page
+js/storage.js     AppStorage object: settings (incl. site lists), session history and garden in localStorage
 js/timer.js       Timer object: countdown engine and focus/break mode switching
 js/stats.js       Stats object: pure calculations over saved sessions (uses AppStorage.toDateKey)
+js/garden.js      Garden object: pure garden rules (flowers, stages, petals, unlocks) + smart messages
 js/blocker.js     SiteBlocker object: sends block/clear/open-timer messages to the extension background
 js/background.js  Extension service worker: applies/removes blocking rules, finds/focuses the timer tab
 js/blocked.js     Blocked page only: "Back to timer" switches to the running timer tab (link fallback)
-js/app.js         Wires UI events to Timer/Storage/Stats/SiteBlocker and renders everything
+js/app.js         Wires UI events to Timer/Storage/Stats/Garden/SiteBlocker and renders everything
 tests/            Dev-only test scripts (never loaded by the app) — see Testing
 ```
 
@@ -50,7 +52,8 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
   each with a live one-line summary:
   - **Timer durations** — custom durations (validated 1–120 min) and "long break after N sessions" (1–12)
   - **Site blocking** — see below
-  - **Data** — "Clear focus history" (asks for confirmation; cannot be undone)
+  - **Garden** — "Show garden and messages" switch, flower picker, unlock button (applies immediately, no Save)
+  - **Data** — "Clear focus history" and "Reset garden" (each asks for confirmation; neither deletes the other's data)
   - Save / Restore defaults live in a footer below the rows; a failed save opens the card and the row with the invalid field
 - Site blocking settings (extension only):
   - Mode: `off` (default) | `blocklist` (block only disallowed sites) | `allowlist` (block every site except allowed ones)
@@ -61,15 +64,32 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
   - Rules end automatically at the focus session's end time, even if the timer tab is closed
   - Blocked page "Back to timer" returns to the running timer tab (most recently used one) and closes the
     blocked tab; if no timer tab is open, the blocked tab becomes the timer
+- Sakura Garden (reward system, original design):
+  - While focus runs the plant grows by share of the session done: seed 0 % → sprout 20 % → leaves 45 % →
+    bud 70 % → bloom 100 %. Breaks grow nothing
+  - Completed focus → a **bloom** of the selected flower + **1 petal per focus minute**
+  - **Pause never wilts.** Reset after ≥ 1 min of focus → a **wilted** plant (no petals); reset in the first minute → nothing
+  - Petals are spent to unlock flowers: Sakura (free) · Tulip 100 · Sunflower 250 · Lotus 500 · Moonflower 1000;
+    the selected flower grows next
+  - Stats card **Garden** toggle (next to Daily/Weekly): petal count, the live plant with "Sakura · bud · 4 min
+    to bloom", and the last 7 days of plants on a soil strip (newest on the right)
+  - **Smart messages** (`#coach` line under Start/Reset) come from the user's own numbers, never random quotes,
+    and change only on events (start, new stage, pause, reset, complete, break), never every tick
+  - Switch off → coach line and Garden toggle hidden (the app looks as before the garden) and nothing is recorded
+  - Stored as `pomodoro.v1.garden`: `{ enabled, petals, unlocked[], selected, plants: [{ date, type,
+    state: 'bloom' | 'wilted', minutes }] }`; at most 500 plants (oldest dropped, petals kept)
 
 ## Conventions
-- Scripts load with `<script defer>` in dependency order: `storage.js` → `timer.js` → `stats.js` → `blocker.js` → `app.js`
-- Each page-side JS file exposes exactly one global object: `AppStorage`, `Timer`, `Stats`, `SiteBlocker`;
+- Scripts load with `<script defer>` in dependency order:
+  `storage.js` → `timer.js` → `stats.js` → `garden.js` → `blocker.js` → `app.js`
+- Each page-side JS file exposes exactly one global object: `AppStorage`, `Timer`, `Stats`, `Garden`, `SiteBlocker`;
   `app.js`, `blocked.js` and `background.js` expose nothing
   (not `Storage` — that name is the browser's built-in `window.Storage` interface)
 - Timer accuracy: compute remaining time from an `endTime` timestamp, never by counting ticks
 - Wrap every `localStorage` read/write in `try/catch` and fall back to defaults
 - Only focus sessions that run to completion are saved (reset = nothing saved)
+- `garden.js` functions never mutate a garden: they return a new object; `app.js` saves it via `storeGarden()`
+  (`AppStorage.saveGarden` + re-render). Storage checks only the shape; which flowers exist is `Garden.CATALOG`
 - Dates use the user's local time zone; weeks start on Monday
 - Charts: plain `<div>` bars sized via a CSS custom property (`--h`); no canvas libraries
 - Use `const`/`let`, `===`, small named functions; no inline `onclick` attributes in HTML
@@ -85,7 +105,11 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
   `--p` percentage that `app.js` sets; ring size is the `--ring` custom property on `.timer`
 - Settings drop-down is native `<details class="settings-menu">` (⚙ = its `<summary>`) holding
   `<section class="settings-card">`; rows are `<details class="setting-row" name="settings">` (exclusive accordion);
-  row summaries (`#durationsSummary`, `#blockingSummary`, `#dataSummary`) always describe the **saved** settings
+  row summaries (`#durationsSummary`, `#blockingSummary`, `#gardenSummary`, `#dataSummary`) always describe the **saved** settings
+- Plants are one inline SVG **sprite** in `index.html` (`<symbol id="plant-seed|sprout|leaves|bud|bloom|wilted">`)
+  reused with `<use>`; flower colors come from variables (`--flower`, `--flower-edge`, `--flower-center`, `--leaf`, …)
+  set by the `.flower-<id>` / `.is-wilted` classes. `app.js` draws plants only via `createPlant()` / `setPlant()`
+- The garden view fills the same area as the chart; below 860px it becomes a compact strip so the page never scrolls
 - All artwork is original CSS + inline SVG: **no images, web fonts, icon fonts or CDNs**; rounded system fonts only
   (`ui-rounded` / `Segoe UI Variable Display`; `Yu Gothic UI` / `Meiryo` for Japanese)
 - The scene is one `<div class="scene" aria-hidden="true">` fixed behind `.app` (`pointer-events: none`);
@@ -111,7 +135,7 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
 Automated tests use **Node 22+ built-ins only** (no npm, no `package.json`) and drive real browsers through the
 Chrome DevTools protocol. Run from the project root:
 ```
-node tests/unit.mjs            # storage.js, stats.js, timer.js in Node (fake clock)       ~1 s
+node tests/unit.mjs            # storage.js, stats.js, timer.js, garden.js in Node        ~1 s
 node tests/e2e-page.mjs        # index.html via file:// in headless Chrome (or Edge)     ~30 s
 node tests/e2e-extension.mjs   # loads the extension unpacked in headless Edge            ~2 min
 ```
@@ -142,7 +166,7 @@ Tip: set Focus/Short = 1 min, Long = 2, "Long break after" = 2 in Settings for a
 
 Settings rows and theme:
 - [ ] ⚙ opens the settings card (gear turns violet); ✕, Esc (focus back on ⚙) and a click outside close it
-- [ ] All three rows start closed; opening one closes the other; chevron flips; keyboard Enter/Space toggles a row
+- [ ] All four rows start closed; opening one closes the other; chevron flips; keyboard Enter/Space toggles a row
 - [ ] Row summaries match saved settings (e.g. "50 / 10 / 20 min · long break every 3", "Blocking 3 sites during focus")
       and do not change until Save
 - [ ] Invalid value in a closed row → Save opens that row and focuses the field
@@ -151,6 +175,22 @@ Settings rows and theme:
 - [ ] Progress ring fills violet → pink as the session runs
 - [ ] Scene: blobs drift, sparkles twinkle, petals fall; dark mode is dusky violet; OS "reduce motion" freezes it
 - [ ] Glass cards stay readable over the pastel background in light and dark mode
+
+Sakura Garden (tip: Focus = 5 min makes each stage ~1 min):
+- [ ] Load → coach says "First bloom of the day starts here — plant a Sakura."
+- [ ] Start → "Seed planted"; the Garden view's plant sways and becomes sprout → leaves → bud as time passes,
+      each with its own message (once, not every second)
+- [ ] Pause → "Paused — your plant will wait for you", stage kept; resume → stage message again
+- [ ] Reset after 1+ min → "That one wilted…", a wilted plant appears in the row, petals unchanged;
+      reset in the first minute → nothing added
+- [ ] Focus completes → "+N petals" message, petal count +N, a bloom appears on the right of the row;
+      start the break → "Bloom saved. Rest your eyes…"; break ends → "Break over — a new … seed is ready."
+- [ ] Hover a plant → "Today · Sakura · bloom · 25 min"; summary line "N blooms · M wilted this week"
+- [ ] Settings → Garden: locked flowers greyed; unlock button disabled until enough petals; unlocking spends
+      petals, selects the flower and the coach/plant use its color
+- [ ] Switch off → coach line and Garden toggle disappear (Daily chart shown), sessions grow nothing; switch on → back
+- [ ] Data → Reset garden: Cancel keeps it; OK empties garden but not focus history (and vice versa for Clear focus history)
+- [ ] Garden view fits one screen at 1280×760, 1366×640 and 390×844 even with many plants
 
 Site blocking (load the extension unpacked first; use `example.com` / `example.org` as test sites):
 - [ ] Extension page: "install as extension" note hidden; toolbar icon opens/focuses the timer tab

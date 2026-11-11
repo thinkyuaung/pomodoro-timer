@@ -1,6 +1,6 @@
 /**
- * app.js — wires the page to AppStorage, Timer and Stats.
- * The only file that touches the DOM. Exposes no globals.
+ * app.js — wires the timer page to AppStorage, Timer, Stats, Garden and SiteBlocker and renders it.
+ * The only file that touches the timer page's DOM (blocked.js handles the blocked page). Exposes no globals.
  */
 (() => {
   'use strict';
@@ -21,6 +21,22 @@
     totalFocus: $('#totalFocus'),
     toggleBtns: document.querySelectorAll('.toggle-btn'),
     chart: $('#chart'),
+    chartTitle: $('#chart-heading'),
+    gardenPanel: $('#gardenPanel'),
+    coach: $('#coach'),
+    coachIcon: $('#coach .plant'),
+    coachText: $('#coachText'),
+    livePlant: $('#livePlant'),
+    liveStage: $('#liveStage'),
+    gardenToggle: $('#gardenToggle'),
+    petalCount: $('#petalCount'),
+    gardenRow: $('#gardenRow'),
+    gardenSummaryLine: $('#gardenSummaryLine'),
+    gardenSummary: $('#gardenSummary'),
+    gardenEnabled: $('#gardenEnabled'),
+    flowerPicker: $('#flowerPicker'),
+    unlockFlower: $('#unlockFlower'),
+    resetGarden: $('#resetGarden'),
     form: $('#settingsForm'),
     formMsg: $('#settingsError'),
     restoreDefaults: $('#restoreDefaults'),
@@ -55,6 +71,11 @@
   // freshly opened page (e.g. "Back to timer" from the blocked page) never clears rules
   // another timer tab set; leftover rules always expire via the background's end-time alarm.
   let lastBlockKey = 'none';
+  let garden = Garden.normalize(AppStorage.getGarden());
+  let lastStage = null;  // growth stage the coach last announced (null = announce the next one)
+  let lastEarned = 0;    // petals from the focus session that just completed
+  let lastBloomSaved = false; // did the last completed focus session record a bloom?
+  let lastLivePlantKey = '';  // flower|stage|growing last drawn in the live plant (redraw only on change)
 
   // ---------- formatting ----------
 
@@ -161,6 +182,7 @@
   }
 
   function renderChart(sessions) {
+    if (chartRange === 'garden') return; // the garden view replaces the chart
     const data = chartRange === 'daily'
       ? Stats.dailyHistory(sessions, 7)
       : Stats.weeklyHistory(sessions, 8);
@@ -212,6 +234,10 @@
     els.toggleBtns.forEach((btn) => {
       btn.setAttribute('aria-pressed', String(btn.dataset.range === range));
     });
+    const showGarden = range === 'garden';
+    els.gardenPanel.hidden = !showGarden;
+    els.chart.hidden = showGarden;
+    els.chartTitle.hidden = showGarden;
     renderChart(AppStorage.getSessions());
   }
 
@@ -343,7 +369,269 @@
     const appliedNow = timer.updateSettings(settings);
     renderMode(timer.getState());
     syncBlocking(timer.getState()); // site settings apply immediately
+    if (appliedNow) {
+      renderLivePlant(timer.getState());
+      coachWaiting(timer.getState()); // e.g. "Plant a Sakura — 50 min to full bloom."
+    }
     return appliedNow;
+  }
+
+  // ---------- garden: live plant + smart messages ----------
+
+  /** Points a plant <svg> at a sprite stage and colors it as the given flower. */
+  function setPlant(svg, flowerId, stage, extraClass = '') {
+    const wilted = stage === 'wilted' ? ' is-wilted' : '';
+    svg.setAttribute('class', `plant flower-${flowerId}${wilted}${extraClass}`);
+    svg.querySelector('use').setAttribute('href', `#plant-${stage}`);
+  }
+
+  function elapsedMs(state) {
+    return state.durationMs - state.remainingMs;
+  }
+
+  function stageOf(state) {
+    return Garden.stageFor(elapsedMs(state) / state.durationMs);
+  }
+
+  function liveStageText(state) {
+    const name = Garden.flowerName(garden.selected);
+    if (state.mode !== 'focus') return `Resting · next up: ${name}`;
+    if (elapsedMs(state) === 0) return `${name} · ready to plant`;
+    const minutesLeft = Math.ceil(state.remainingMs / 60000);
+    return `${name} · ${stageOf(state)} · ${minutesLeft} min to bloom`;
+  }
+
+  function renderLivePlant(state) {
+    const growing = state.mode === 'focus' && state.running;
+    const stage = state.mode === 'focus' ? stageOf(state) : 'seed';
+    const key = `${garden.selected}|${stage}|${growing}`;
+    if (key !== lastLivePlantKey) {
+      lastLivePlantKey = key;
+      setPlant(els.livePlant, garden.selected, stage, growing ? ' is-growing' : '');
+    }
+    els.liveStage.textContent = liveStageText(state);
+  }
+
+  /** The numbers the smart messages are built from. */
+  function messageContext(extra) {
+    return {
+      flower: garden.selected,
+      focusMin: currentSettings.focus,
+      breakMin: currentSettings.short,
+      cycleLength: currentSettings.longEvery,
+      bloomsToday: Garden.bloomsOn(garden, 0),
+      bloomsYesterday: Garden.bloomsOn(garden, 1),
+      nextUnlock: Garden.nextUnlock(garden),
+      earnedText: plural(lastEarned, 'petal'),
+      bloomSaved: lastBloomSaved,
+      ...extra,
+    };
+  }
+
+  function coach(event, extra = {}) {
+    const { text, icon } = Garden.message(event, messageContext(extra));
+    setPlant(els.coachIcon, garden.selected, icon);
+    els.coachText.textContent = text;
+  }
+
+  /** Message for a loaded session (and a running break): uses the session's real length, not pending settings. */
+  function coachWaiting(state) {
+    if (state.mode === 'focus') coach('idle');
+    else if (state.mode === 'long') coach('long', { cycleLength: state.longEvery });
+    else coach('break', { breakMin: Math.round(state.durationMs / 60000) });
+  }
+
+  /** Announces each new growth stage once while focus runs (never every tick). */
+  function coachGrowth(state) {
+    if (state.mode !== 'focus' || !state.running) return;
+    const stage = stageOf(state);
+    if (stage === lastStage) return;
+    lastStage = stage;
+    coach('stage', { stage });
+  }
+
+  function storeGarden(next) {
+    const result = AppStorage.saveGarden(next);
+    if (!result.ok) console.warn('[app] garden could not be saved');
+    garden = Garden.normalize(result.garden);
+    renderGarden();
+  }
+
+  /** Before a reset: a focus session reset after the first minute wilts its plant. */
+  function wiltIfNeeded(state) {
+    if (!garden.enabled || !Garden.shouldWilt(state.mode, elapsedMs(state))) return false;
+    storeGarden(Garden.recordWilt(garden, elapsedMs(state) / 60000));
+    return true;
+  }
+
+  // ---------- garden: view, settings row, on/off ----------
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const fmtPlantDay = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+
+  /** A new plant <svg> that reuses a sprite stage. */
+  function createPlant(flowerId, stage) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 40 48');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.appendChild(document.createElementNS(SVG_NS, 'use'));
+    setPlant(svg, flowerId, stage);
+    return svg;
+  }
+
+  /** "Today" / "Yesterday" / "Mon" for a plant's date key. */
+  function plantDayLabel(dateKey) {
+    const today = new Date();
+    if (dateKey === AppStorage.toDateKey(today)) return 'Today';
+    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    if (dateKey === AppStorage.toDateKey(yesterday)) return 'Yesterday';
+    const [year, month, day] = dateKey.split('-').map(Number);
+    return fmtPlantDay.format(new Date(year, month - 1, day));
+  }
+
+  function plantTitle(plant) {
+    const what = plant.state === 'bloom' ? `bloom · ${plant.minutes} min` : `wilted after ${plant.minutes} min`;
+    return `${plantDayLabel(plant.date)} · ${Garden.flowerName(plant.type)} · ${what}`;
+  }
+
+  function createPlantItem(plant) {
+    const item = document.createElement('li');
+    item.title = plantTitle(plant);
+    item.appendChild(createPlant(Garden.displayType(plant.type), plant.state === 'bloom' ? 'bloom' : 'wilted'));
+    return item;
+  }
+
+  /** The soil strip: plants from the last 7 days, newest first (CSS shows newest on the right). */
+  function renderGardenRow(recent) {
+    els.gardenRow.replaceChildren();
+    if (recent.length === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'garden-empty';
+      empty.textContent = 'Finish a focus session to grow your first bloom.';
+      els.gardenRow.appendChild(empty);
+      return;
+    }
+    recent.forEach((plant) => els.gardenRow.appendChild(createPlantItem(plant)));
+  }
+
+  function weekSummaryText(recent) {
+    const { blooms, wilted } = Garden.countStates(recent);
+    return wilted === 0 ? `${plural(blooms, 'bloom')} this week` : `${plural(blooms, 'bloom')} · ${wilted} wilted this week`;
+  }
+
+  function renderGardenView() {
+    const recent = Garden.recentPlants(garden, 7);
+    els.petalCount.textContent = String(garden.petals);
+    renderGardenRow(recent);
+    els.gardenSummaryLine.textContent = weekSummaryText(recent);
+  }
+
+  function flowerCostText(flower) {
+    if (flower.cost === 0) return 'Free';
+    return garden.unlocked.includes(flower.id) ? 'Unlocked' : `${flower.cost} petals`;
+  }
+
+  /** One picker option, built once at init; updateFlowerOption() refreshes it (rebuilding would drop keyboard focus). */
+  function createFlowerOption(flower) {
+    const label = document.createElement('label');
+    label.dataset.flower = flower.id;
+    const radio = document.createElement('input');
+    Object.assign(radio, { type: 'radio', name: 'gardenFlower', value: flower.id });
+    const card = document.createElement('span');
+    card.className = 'flower-card';
+    const name = document.createElement('span');
+    name.className = 'flower-name';
+    name.textContent = flower.name;
+    const cost = document.createElement('span');
+    cost.className = 'flower-cost';
+    card.append(createPlant(flower.id, 'bloom'), name, cost);
+    label.append(radio, card);
+    return label;
+  }
+
+  function updateFlowerOption(label) {
+    const flower = Garden.flowerById(label.dataset.flower);
+    const locked = !garden.unlocked.includes(flower.id);
+    const radio = label.querySelector('input');
+    label.className = `flower-option${locked ? ' is-locked' : ''}`;
+    radio.disabled = locked;
+    radio.checked = garden.selected === flower.id;
+    label.querySelector('.flower-cost').textContent = flowerCostText(flower);
+  }
+
+  function buildFlowerPicker() {
+    els.flowerPicker.append(...Garden.CATALOG.map(createFlowerOption));
+  }
+
+  function renderUnlockButton() {
+    const next = Garden.nextUnlock(garden);
+    els.unlockFlower.hidden = next === null;
+    if (!next) return;
+    els.unlockFlower.disabled = next.needed > 0;
+    els.unlockFlower.textContent = next.needed > 0
+      ? `${next.flower.name}: ${plural(next.needed, 'more petal')} to unlock`
+      : `Unlock ${next.flower.name} · ${next.flower.cost} petals`;
+  }
+
+  function renderGardenSettings() {
+    els.gardenEnabled.checked = garden.enabled;
+    els.flowerPicker.querySelectorAll('label[data-flower]').forEach(updateFlowerOption);
+    renderUnlockButton();
+    els.gardenSummary.textContent = garden.enabled
+      ? `On · ${plural(garden.petals, 'petal')} · growing ${Garden.flowerName(garden.selected)}`
+      : 'Off';
+  }
+
+  /** "Show garden and messages" off = the timer and stats look exactly as they did before the garden. */
+  function renderGardenVisibility() {
+    els.coach.hidden = !garden.enabled;
+    els.gardenToggle.hidden = !garden.enabled;
+    if (!garden.enabled && chartRange === 'garden') setChartRange('daily');
+  }
+
+  function renderGarden() {
+    renderGardenView();
+    renderGardenSettings();
+    renderGardenVisibility();
+  }
+
+  /** After the flower or the on/off switch changes, refresh the plant and message if nothing is running. */
+  function refreshIdleGarden() {
+    const state = timer.getState();
+    renderLivePlant(state);
+    if (!state.running) coachWaiting(state);
+  }
+
+  function onGardenEnabledChange() {
+    storeGarden({ ...garden, enabled: els.gardenEnabled.checked });
+    refreshIdleGarden();
+  }
+
+  function onFlowerSelect(flowerId) {
+    storeGarden(Garden.select(garden, flowerId));
+    refreshIdleGarden();
+  }
+
+  function onUnlockFlower() {
+    const next = Garden.nextUnlock(garden);
+    if (!next || !Garden.canUnlock(garden, next.flower.id)) return;
+    storeGarden(Garden.unlock(garden, next.flower.id));
+    refreshIdleGarden();
+    showFormMessage(`${next.flower.name} unlocked — it grows next.`, true);
+  }
+
+  function onResetGarden() {
+    if (garden.petals === 0 && garden.plants.length === 0) {
+      showFormMessage('Your garden is already empty.', true);
+      return;
+    }
+    const question = `Reset your garden? ${plural(garden.plants.length, 'plant')} and ${plural(garden.petals, 'petal')} will be removed. Focus history is kept.`;
+    if (!window.confirm(question)) return;
+    const wasEnabled = garden.enabled;
+    storeGarden({ ...AppStorage.resetGarden(), enabled: wasEnabled });
+    refreshIdleGarden();
+    showFormMessage('Garden reset.', true);
   }
 
   // ---------- site blocking ----------
@@ -381,6 +669,8 @@
     onTick(state) {
       renderTimer(state);
       syncBlocking(state); // start/pause/reset/mode switch all emit a tick
+      renderLivePlant(state);
+      coachGrowth(state);
     },
 
     onModeChange(state) {
@@ -390,12 +680,20 @@
       announce(state.mode === 'focus'
         ? 'Break over. Focus is ready — press Start when you are.'
         : `Focus complete. ${MODE_NAMES[state.mode]} is ready — press Start when you are.`);
+      lastStage = null;
+      if (state.mode === 'focus') coach('ready');
+      else if (lastBloomSaved) coach('complete'); // onFocusComplete already saved the bloom
+      else coachWaiting(state); // garden off: no bloom and no petals to announce
     },
 
     onFocusComplete(durationMin) {
       if (!AppStorage.addSession(durationMin)) {
         console.warn('[app] focus session could not be saved');
       }
+      lastBloomSaved = garden.enabled;
+      lastEarned = garden.enabled ? Garden.petalsFor(durationMin) : 0;
+      if (!garden.enabled) return; // garden switched off: nothing grows
+      storeGarden(Garden.recordBloom(garden, durationMin));
     },
   });
 
@@ -403,13 +701,21 @@
 
   els.startPause.addEventListener('click', () => {
     unlockAudio();
+    lastStage = null; // starting/resuming focus re-announces the current stage
     timer.toggle();
-    announce(timer.getState().running ? 'Timer started.' : 'Timer paused.');
+    const state = timer.getState();
+    announce(state.running ? 'Timer started.' : 'Timer paused.');
+    if (state.mode !== 'focus') coachWaiting(state); // breaks: rest message, running or paused
+    else if (!state.running) coach('paused', { stage: stageOf(state) });
   });
 
   els.reset.addEventListener('click', () => {
+    const wilted = wiltIfNeeded(timer.getState()); // read BEFORE reset clears the elapsed time
     timer.reset();
-    announce('Timer reset.');
+    lastStage = null;
+    announce(wilted ? 'Timer reset. That plant wilted.' : 'Timer reset.');
+    if (wilted) coach('wilt');
+    else coachWaiting(timer.getState());
   });
 
   els.toggleBtns.forEach((btn) => {
@@ -419,6 +725,9 @@
   els.form.addEventListener('submit', onSettingsSubmit);
   els.restoreDefaults.addEventListener('click', onRestoreDefaults);
   els.clearHistory.addEventListener('click', onClearHistory);
+  els.gardenEnabled.addEventListener('change', onGardenEnabledChange);
+  els.unlockFlower.addEventListener('click', onUnlockFlower);
+  els.resetGarden.addEventListener('click', onResetGarden);
 
   // Settings drop-down card (<details class="settings-menu">): ⚙ toggles it natively;
   // ✕, Esc and a click outside also close it.
@@ -442,6 +751,7 @@
   });
   els.form.addEventListener('change', (event) => {
     if (event.target.name === 'blockMode') renderBlockModeUI();
+    if (event.target.name === 'gardenFlower') onFlowerSelect(event.target.value);
   });
 
   // Keyboard: Space = start/pause, R = reset.
@@ -461,7 +771,10 @@
 
   // Refresh "today" figures when the user comes back to the tab (e.g. next morning).
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) renderStats();
+    if (!document.hidden) {
+      renderStats();
+      renderGardenView(); // only the "Today" / "this week" labels can change
+    }
   });
 
   // ---------- init ----------
@@ -473,4 +786,8 @@
   renderTimer(initial);
   renderStats();
   renderBlockStatus(null);
+  buildFlowerPicker();
+  renderGarden();
+  renderLivePlant(initial);
+  coachWaiting(initial);
 })();

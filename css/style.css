@@ -53,6 +53,31 @@
   --bar-from: #c4b5fd;
   --bar-to: #e9d5ff;
 
+  /* Garden plants */
+  --soil: #ead7cf;
+  --seed: #c69c7c;
+  --stem: #5fb889;
+  --leaf: #9fe0b8;
+  --leaf-edge: #5fb889;
+  --wilt: #cbbcb3;
+  --wilt-edge: #a8968b;
+  --flower-sakura: #f9a8d4;
+  --flower-sakura-edge: #ec4899;
+  --flower-sakura-center: #fde68a;
+  --flower-tulip: #fda4af;
+  --flower-tulip-edge: #f43f5e;
+  --flower-tulip-center: #fb7185;
+  --flower-sunflower: #fde047;
+  --flower-sunflower-edge: #eab308;
+  --flower-sunflower-center: #a16207;
+  --flower-lotus: #ddd6fe;
+  --flower-lotus-edge: #a78bfa;
+  --flower-lotus-center: #fef3c7;
+  --flower-moonflower: #e0f2fe;
+  --flower-moonflower-edge: #7dd3fc;
+  --flower-moonflower-center: #bae6fd;
+  --bed: linear-gradient(to bottom, transparent 62%, rgb(234 215 207 / 0.55) 62%);
+
   --radius: 28px;
   --radius-sm: 16px;
   --shadow: 0 2px 8px rgb(139 92 246 / 0.08), 0 20px 50px rgb(139 92 246 / 0.16);
@@ -95,6 +120,16 @@
     --row-highlight: rgb(255 255 255 / 0.04);
     --bar-from: #7c3aed;
     --bar-to: #c4b5fd;
+
+    --soil: #4a3a5e;
+    --seed: #b08a6c;
+    --stem: #6ee7b7;
+    --leaf: #34a37a;
+    --leaf-edge: #6ee7b7;
+    --wilt: #6b5f72;
+    --wilt-edge: #8f8197;
+    --flower-moonflower: #c7e6fb;
+    --bed: linear-gradient(to bottom, transparent 62%, rgb(74 58 94 / 0.55) 62%);
 
     --shadow: 0 2px 8px rgb(0 0 0 / 0.3), 0 20px 50px rgb(0 0 0 / 0.35);
   }
@@ -398,6 +433,8 @@ h1, h2, h3 { margin: 0; line-height: 1.2; }
 }
 .btn:hover { transform: translateY(-1px); background: var(--glass-strong); }
 .btn:active { transform: translateY(0); }
+.btn:disabled,
+.btn:disabled:hover { cursor: not-allowed; transform: none; opacity: 0.6; border-style: dashed; background: transparent; }
 
 .btn-primary {
   background: var(--gradient-brand);
@@ -513,6 +550,63 @@ h1, h2, h3 { margin: 0; line-height: 1.2; }
   font-weight: 700;
 }
 
+/* Smart message under the controls (garden coach) */
+.coach {
+  margin: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary-strong);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.coach .plant { width: 22px; height: 26px; }
+.coach span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Garden plants (inline SVG sprite in index.html, reused with <use>)
+   ========================================================================== */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.plant {
+  flex: none;
+  overflow: visible;
+  --flower: var(--flower-sakura);
+  --flower-edge: var(--flower-sakura-edge);
+  --flower-center: var(--flower-sakura-center);
+}
+.flower-tulip      { --flower: var(--flower-tulip);      --flower-edge: var(--flower-tulip-edge);      --flower-center: var(--flower-tulip-center); }
+.flower-sunflower  { --flower: var(--flower-sunflower);  --flower-edge: var(--flower-sunflower-edge);  --flower-center: var(--flower-sunflower-center); }
+.flower-lotus      { --flower: var(--flower-lotus);      --flower-edge: var(--flower-lotus-edge);      --flower-center: var(--flower-lotus-center); }
+.flower-moonflower { --flower: var(--flower-moonflower); --flower-edge: var(--flower-moonflower-edge); --flower-center: var(--flower-moonflower-center); }
+.plant.is-wilted {
+  --flower: var(--wilt);
+  --flower-edge: var(--wilt-edge);
+  --flower-center: var(--wilt-edge);
+  --leaf: var(--wilt);
+  --leaf-edge: var(--wilt-edge);
+  --stem: var(--wilt-edge);
+}
+
+.p-soil   { fill: var(--soil); }
+.p-seed   { fill: var(--seed); }
+.p-stem   { fill: none; stroke: var(--stem); stroke-width: 2.4; stroke-linecap: round; }
+.p-leaf   { fill: var(--leaf); stroke: var(--leaf-edge); stroke-width: 0.8; }
+.p-petal  { fill: var(--flower); stroke: var(--flower-edge); stroke-width: 0.8; }
+.p-center { fill: var(--flower-center); }
+
+.plant.is-growing { transform-origin: 50% 92%; animation: sway 4s ease-in-out infinite; }
+@keyframes sway {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50%      { transform: rotate(2.5deg); }
+}
+
 /* ==========================================================================
    Stats card
    ========================================================================== */
@@ -625,6 +719,94 @@ h1, h2, h3 { margin: 0; line-height: 1.2; }
   white-space: nowrap;
 }
 .bar-col.is-current .bar-label { color: var(--sakura); font-weight: 700; }
+
+/* Garden view (third stats toggle; same area as the chart) */
+.garden {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.6vh, 14px);
+}
+.garden-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.petal-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--glass-border);
+  color: var(--sakura);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.petal-count svg { width: 14px; height: 14px; }
+
+.garden-bed {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  padding: clamp(10px, 1.8vh, 16px) 14px;
+  background: var(--panel);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+}
+.garden-now {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2.4vw, 28px);
+}
+.garden-now .plant {
+  width: clamp(40px, 13vh, 110px);
+  height: clamp(48px, 15.6vh, 132px);
+}
+.garden-now-text {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.garden-now-text strong { color: var(--text); font-size: 0.95rem; }
+
+/* Newest plant first in the DOM, shown on the right; the oldest are clipped on the left */
+.garden-row {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px;
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  gap: 2px;
+  overflow: hidden;
+  background: var(--bed);
+  border-radius: 0 0 12px 12px;
+}
+.garden-row li { flex: none; display: flex; }
+.garden-row .garden-empty {
+  flex: 1;
+  justify-content: center;
+  padding: 8px 0 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.garden-row .plant { width: 30px; height: 36px; }
+
+.garden-now-text .garden-summary { margin-top: 4px; font-size: 0.78rem; }
 
 /* ==========================================================================
    Settings card contents — expandable rows
@@ -815,6 +997,79 @@ h1, h2, h3 { margin: 0; line-height: 1.2; }
   flex-direction: column;
   gap: 8px;
 }
+/* Garden settings row */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch-track {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--track);
+  border: 1px solid var(--border);
+  transition: background 0.2s ease;
+}
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--glass-strong);
+  transition: transform 0.2s ease;
+}
+.switch input:checked + .switch-track { background: var(--gradient-brand); border-color: transparent; }
+.switch input:checked + .switch-track::after { transform: translateX(16px); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.flower-picker {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.flower-picker legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.flower-option { position: relative; cursor: pointer; }
+.flower-option input { position: absolute; opacity: 0; pointer-events: none; }
+.flower-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 2px 6px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--glass-border);
+  text-align: center;
+}
+.flower-card .plant { width: 30px; height: 36px; }
+.flower-name { font-size: 0.75rem; font-weight: 700; }
+.flower-cost { font-size: 0.68rem; color: var(--muted); white-space: nowrap; }
+.flower-option input:checked + .flower-card { border-color: var(--primary); background: var(--glass-strong); }
+.flower-option input:checked + .flower-card .flower-name { color: var(--primary-strong); }
+.flower-option input:focus-visible + .flower-card { outline: 2px solid var(--primary); outline-offset: 2px; }
+.flower-option.is-locked { cursor: default; }
+.flower-option.is-locked .plant { opacity: 0.45; filter: grayscale(0.6); }
+
+.data-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
 .form-error {
   margin: 0;
   min-height: 1.2em;
@@ -871,6 +1126,15 @@ a.btn { text-decoration: none; display: inline-block; }
     grid-template-rows: auto minmax(0, 1fr);
   }
   .timer { --ring: min(34vh, 62vw, 300px); gap: clamp(8px, 1.6vh, 16px); }
+  /* Compact garden: same height as the chart; the coach icon still shows the live stage */
+  .garden { gap: 8px; }
+  .garden-bed { min-height: 70px; padding: 8px 12px; gap: 6px; }
+  .garden-now { flex: none; justify-content: flex-start; }
+  .garden-now .plant,
+  .garden-now-text .garden-summary { display: none; }
+  .garden-now-text { flex-direction: row; flex-wrap: wrap; gap: 0 6px; font-size: 0.8rem; }
+  .garden-now-text strong { font-size: 0.85rem; }
+  .garden-row .plant { width: 24px; height: 29px; }
 }
 @media (max-width: 480px) {
   .brand h1 { font-size: 1.25rem; }

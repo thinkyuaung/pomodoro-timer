@@ -12,12 +12,22 @@
  *     blockedSites: string[], allowedSites: string[]   // bare domains, e.g. "youtube.com"
  *   }
  *   session:  { date: "YYYY-MM-DD" (local), completedAt: ISO string, durationMin: number }
+ *   garden:   { enabled: boolean, petals: number, unlocked: string[], selected: string,
+ *               plants: [{ date: "YYYY-MM-DD", type: string, state: 'bloom' | 'wilted', minutes: number }] }
+ *             (storage checks the shape only; which flowers exist is Garden's job, see garden.js)
  */
 const AppStorage = (() => {
   const KEYS = {
     settings: 'pomodoro.v1.settings',
     sessions: 'pomodoro.v1.sessions',
+    garden: 'pomodoro.v1.garden',
   };
+
+  const MAX_PLANTS = 500; // oldest plants are dropped first; earned petals are kept
+  const STARTER_FLOWER = 'sakura';
+  const PLANT_STATES = Object.freeze(['bloom', 'wilted']);
+  const FLOWER_ID_RE = /^[a-z]{1,20}$/;
+  const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
   const BLOCK_MODES = Object.freeze(['off', 'blocklist', 'allowlist']);
   const MAX_SITES = 100;
@@ -205,7 +215,7 @@ const AppStorage = (() => {
       s !== null &&
       typeof s === 'object' &&
       typeof s.date === 'string' &&
-      /^\d{4}-\d{2}-\d{2}$/.test(s.date) &&
+      DATE_KEY_RE.test(s.date) &&
       typeof s.completedAt === 'string' &&
       Number.isFinite(s.durationMin) &&
       s.durationMin > 0
@@ -269,6 +279,66 @@ const AppStorage = (() => {
     remove(KEYS.sessions);
   }
 
+  // ---------- garden ----------
+
+  function defaultGarden() {
+    return { enabled: true, petals: 0, unlocked: [STARTER_FLOWER], selected: STARTER_FLOWER, plants: [] };
+  }
+
+  function isFlowerId(value) {
+    return typeof value === 'string' && FLOWER_ID_RE.test(value);
+  }
+
+  function isValidPlant(plant) {
+    return (
+      plant !== null &&
+      typeof plant === 'object' &&
+      typeof plant.date === 'string' &&
+      DATE_KEY_RE.test(plant.date) &&
+      isFlowerId(plant.type) &&
+      PLANT_STATES.includes(plant.state) &&
+      Number.isFinite(plant.minutes) &&
+      plant.minutes >= 0
+    );
+  }
+
+  /** Unique flower ids, always starting with the free starter flower. */
+  function cleanUnlocked(list) {
+    const ids = Array.isArray(list) ? list.filter(isFlowerId) : [];
+    return [...new Set([STARTER_FLOWER, ...ids])];
+  }
+
+  /** Always returns a complete garden object: bad fields fall back, bad plants are skipped. */
+  function cleanGarden(candidate) {
+    const input = candidate && typeof candidate === 'object' ? candidate : {};
+    const garden = defaultGarden();
+    if (typeof input.enabled === 'boolean') garden.enabled = input.enabled;
+    if (Number.isInteger(input.petals) && input.petals >= 0) garden.petals = input.petals;
+    garden.unlocked = cleanUnlocked(input.unlocked);
+    if (garden.unlocked.includes(input.selected)) garden.selected = input.selected;
+    const plants = Array.isArray(input.plants) ? input.plants.filter(isValidPlant) : [];
+    garden.plants = plants.slice(-MAX_PLANTS).map((p) => ({ date: p.date, type: p.type, state: p.state, minutes: p.minutes }));
+    return garden;
+  }
+
+  function getGarden() {
+    return cleanGarden(read(KEYS.garden, {}));
+  }
+
+  /**
+   * Cleans and saves the garden (oldest plants beyond MAX_PLANTS are dropped).
+   * @returns {{ ok: boolean, garden: object }} garden = what is now stored (or would have been)
+   */
+  function saveGarden(candidate) {
+    const garden = cleanGarden(candidate);
+    return { ok: write(KEYS.garden, garden), garden };
+  }
+
+  function resetGarden() {
+    remove(KEYS.garden);
+    return defaultGarden();
+  }
+
   return Object.freeze({
     DEFAULTS,
     LIMITS,
@@ -283,5 +353,9 @@ const AppStorage = (() => {
     getSessions,
     addSession,
     clearSessions,
+    MAX_PLANTS,
+    getGarden,
+    saveGarden,
+    resetGarden,
   });
 })();
