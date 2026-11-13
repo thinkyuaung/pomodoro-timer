@@ -389,6 +389,35 @@ await load();
 check((await themeNow()) === 'light' && (await q('#appearanceSummary')) === 'Match system', 'theme: tampered value falls back to System');
 await send('Emulation.setEmulatedMedia', { features: [] });
 
+// 20. Two timer tabs share one garden: a change in one tab must never erase the other tab's progress
+await ev(`localStorage.clear()`);
+await load();
+const tabB = await (await fetch(`http://127.0.0.1:${PORT}/json/new?about:blank`, { method: 'PUT' })).json();
+const wsB = new WebSocket(tabB.webSocketDebuggerUrl);
+await new Promise((r) => wsB.addEventListener('open', r));
+let idB = 0; const pendingB = new Map();
+wsB.addEventListener('message', (e) => { const m = JSON.parse(e.data); if (m.id && pendingB.has(m.id)) { pendingB.get(m.id)(m); pendingB.delete(m.id); } });
+const sendB = (method, params = {}) => new Promise((r) => { const i = ++idB; pendingB.set(i, r); wsB.send(JSON.stringify({ id: i, method, params })); });
+const evB = async (expr) => (await sendB('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true })).result.result.value;
+await sendB('Page.enable');
+await sendB('Page.addScriptToEvaluateOnNewDocument', { source: 'window.__skew = 0; const __n = Date.now.bind(Date); Date.now = () => __n() + window.__skew;' });
+await sendB('Page.navigate', { url: pageUrl }); await sleep(800);
+await sendB('Page.bringToFront');
+await evB(`document.getElementById('startPause').click()`);                 // tab B starts a 25-min focus first
+await send('Page.bringToFront');
+await click('#startPause'); await skip(1501); await sleep(300);                   // tab A completes its 25-min focus
+check((await savedGarden()).petals === 25, 'two tabs: tab A saved its bloom (+25 petals)', JSON.stringify(await savedGarden()));
+await sendB('Page.bringToFront');
+await evB('window.__skew += 120000'); await sleep(500);
+await evB(`document.getElementById('reset').click()`); await sleep(200);    // tab B resets after 2 min → wilt
+gd = await savedGarden();
+check(gd.petals === 25 && gd.plants.map((p) => p.state).join() === 'bloom,wilted',
+  'two tabs: tab B\'s wilt keeps tab A\'s bloom and petals (no stale overwrite)', JSON.stringify(gd));
+check((await evB(`document.getElementById('petalCount').textContent`)) === '25', 'two tabs: tab B shows the shared petal count after saving');
+wsB.close();
+await fetch(`http://127.0.0.1:${PORT}/json/close/${tabB.id}`);
+await send('Page.bringToFront');
+
 check(errors.length === 0, 'no console errors / exceptions', errors.join(' | '));
 
 ws.close(); await closeBrowser();

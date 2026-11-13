@@ -39,5 +39,6 @@ Read `.claude/rules/garden.md` first. Garden logic stays pure in `js/garden.js`;
 ## Rules that must keep holding
 - Only focus sessions ≥ `Garden.MIN_FOCUS_MINUTES` (25) affect the garden — every new garden touchpoint in
   `app.js` goes through `gardenGrows(state)`
-- `garden.js` functions return a new garden, never mutate; `app.js` saves via `storeGarden()`
+- `garden.js` functions return a new garden, never mutate; `app.js` changes it only via
+  `updateGarden((latest) => …)` (re-read → change → save), never by saving its in-memory copy
 - Run the `verify` skill

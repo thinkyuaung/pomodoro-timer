@@ -485,6 +485,11 @@
     coach('stage', { stage });
   }
 
+  /** Re-reads the saved garden: another timer tab may have changed it since this tab last looked. */
+  function reloadGarden() {
+    garden = Garden.normalize(AppStorage.getGarden());
+  }
+
   function storeGarden(next) {
     const result = AppStorage.saveGarden(next);
     if (!result.ok) console.warn('[app] garden could not be saved');
@@ -492,10 +497,22 @@
     renderGarden();
   }
 
+  /**
+   * The ONLY way to change the garden: re-read the latest saved garden, apply `change` to it, save.
+   * Saving this tab's in-memory copy instead would erase blooms/petals another timer tab saved meanwhile.
+   * @param {(latest: object) => object} change  e.g. (g) => Garden.recordBloom(g, 25)
+   */
+  function updateGarden(change) {
+    reloadGarden();
+    storeGarden(change(garden));
+  }
+
   /** Before a reset: a garden-sized focus session reset after the first minute wilts its plant. */
   function wiltIfNeeded(state) {
+    reloadGarden(); // the switch may have been changed in another tab
     if (!garden.enabled || !gardenGrows(state) || !Garden.shouldWilt(state.mode, elapsedMs(state))) return false;
-    storeGarden(Garden.recordWilt(garden, elapsedMs(state) / 60000));
+    const minutes = elapsedMs(state) / 60000;
+    updateGarden((latest) => Garden.recordWilt(latest, minutes));
     return true;
   }
 
@@ -639,24 +656,30 @@
   }
 
   function onGardenEnabledChange() {
-    storeGarden({ ...garden, enabled: els.gardenEnabled.checked });
+    const enabled = els.gardenEnabled.checked;
+    updateGarden((latest) => ({ ...latest, enabled }));
     refreshIdleGarden();
   }
 
   function onFlowerSelect(flowerId) {
-    storeGarden(Garden.select(garden, flowerId));
+    updateGarden((latest) => Garden.select(latest, flowerId));
     refreshIdleGarden();
   }
 
   function onUnlockFlower() {
+    reloadGarden(); // another tab may have spent or earned petals since this button was drawn
     const next = Garden.nextUnlock(garden);
-    if (!next || !Garden.canUnlock(garden, next.flower.id)) return;
-    storeGarden(Garden.unlock(garden, next.flower.id));
+    if (!next || !Garden.canUnlock(garden, next.flower.id)) {
+      renderGarden(); // redraw the button from the latest petals instead of acting on a stale one
+      return;
+    }
+    updateGarden((latest) => Garden.unlock(latest, next.flower.id));
     refreshIdleGarden();
     showFormMessage(`${next.flower.name} unlocked — it grows next.`, true);
   }
 
   function onResetGarden() {
+    reloadGarden(); // count and confirm what is really saved, incl. other tabs' plants
     if (garden.petals === 0 && garden.plants.length === 0) {
       showFormMessage('Your garden is already empty.', true);
       return;
@@ -726,11 +749,12 @@
         console.warn('[app] focus session could not be saved');
       }
       // Garden switched off, or a session shorter than Garden.MIN_FOCUS_MINUTES: the garden is untouched
+      reloadGarden(); // the switch may have been changed in another tab
       const grows = garden.enabled && Garden.affectsGarden('focus', durationMin);
       lastBloomSaved = grows;
       lastEarned = grows ? Garden.petalsFor(durationMin) : 0;
       if (!grows) return;
-      storeGarden(Garden.recordBloom(garden, durationMin));
+      updateGarden((latest) => Garden.recordBloom(latest, durationMin));
     },
   });
 
@@ -811,7 +835,9 @@
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       renderStats();
-      renderGardenView(); // only the "Today" / "this week" labels can change
+      reloadGarden(); // another timer tab may have grown, wilted or unlocked something meanwhile
+      renderGarden();
+      renderLivePlant(timer.getState());
     }
   });
 

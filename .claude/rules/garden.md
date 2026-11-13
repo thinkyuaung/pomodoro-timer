@@ -40,7 +40,10 @@ paths:
 
 ## Code
 - `garden.js` is pure (no DOM, no storage). Its functions never mutate a garden; they return a new object.
-  `app.js` saves through `storeGarden()` (`AppStorage.saveGarden` + re-render)
+  `app.js` changes the garden ONLY via `updateGarden((latest) => Garden.<change>(latest, …))`: it re-reads the
+  saved garden, applies the change, saves and re-renders. Never save the in-memory `garden` directly — another
+  timer tab may have saved blooms/petals since (two-tab e2e check). Read-then-decide code calls `reloadGarden()`
+  first; returning to the tab reloads too. Only Reset garden replaces everything on purpose
 - Storage checks only the shape; which flowers exist is `Garden.CATALOG`. Unknown flower ids (from a newer
   version) are kept, shown as Sakura
 - Stored as `pomodoro.v1.garden`: `{ enabled, petals, unlocked[], selected, plants: [{ date, type,
