@@ -8,21 +8,29 @@ distracting websites during focus sessions.
 - HTML5, CSS3, vanilla JavaScript (ES2015+) only
 - Optional Chrome/Edge Manifest V3 extension wrapper (same files, loaded unpacked) for site blocking
 
-## Rules
+## Rules (every file)
 - No React, Vue, Angular, or any other framework
 - No backend — everything runs in the browser; data persists in `localStorage`
 - No external libraries, CDNs, or npm packages (no build step, no `package.json`)
-- All storage code lives in `js/storage.js` — no other file may call `localStorage` directly
+- All storage code lives in `js/storage.js` — no other file may call `localStorage` directly; every
+  read/write is wrapped in `try/catch` and falls back to defaults
 - Only `js/app.js` (timer page) and `js/blocked.js` (blocked page) touch the DOM; `timer.js`, `stats.js`,
-  `garden.js` and `blocker.js` have no DOM access. Single exception: `js/theme.js` sets ONLY
-  `<html data-theme>`
+  `garden.js` and `blocker.js` have no DOM access. Single exception: `js/theme.js` sets ONLY `<html data-theme>`
 - `chrome.*` extension APIs are used only in `js/blocker.js` (page side) and `js/background.js` (service worker)
-- `js/background.js` keeps no persistent state: only session blocking rules + one `chrome.alarms` alarm
 - The app must keep working as a plain page opened from `file://`; blocking is then simply unavailable
 - No inline scripts or `onclick` attributes (extension pages forbid them via CSP)
-- Use meaningful variable names
-- Keep functions small and readable
 
+## Area rules and skills
+Rules in `.claude/rules/` load automatically: `naming.md` always; the others when a matching file is opened.
+```
+naming.md     names, code style, reuse                          (always)
+timer.md      countdown, cycle, never auto-start                js/timer.js, js/app.js
+stats.md      sessions data, dates, charts                      js/stats.js, js/app.js
+settings.md   settings card, Save vs immediate, validation      js/storage.js, js/app.js, js/theme.js, index.html
+garden.md     25-min minimum, growth, petals, messages          js/garden.js, js/app.js, index.html, css/style.css
+extension.md  site blocking, background worker, blocked page    manifest.json, js/background.js, js/blocker.js, ...
+design.md     theme (light/dark), colors, one screen, motion    css/**, *.html, js/theme.js
+```
 
 ## Structure
 ```
@@ -40,130 +48,36 @@ js/background.js  Extension service worker: applies/removes blocking rules, find
 js/blocked.js     Blocked page only: "Back to timer" switches to the running timer tab (link fallback)
 js/app.js         Wires UI events to Timer/Storage/Stats/Garden/SiteBlocker and renders everything
 tests/            Dev-only test scripts (never loaded by the app) — see Testing
+.claude/rules/    Area rules (auto-loaded, see above)
+.claude/skills/   Step-by-step task guides (loaded on demand)
 ```
 
-## Features
-- Start, pause, reset
-- Auto switch: focus (25 min) → short break (5 min); long break (15 min) after every 4 focus sessions
-  - The timer switches to the next session automatically, but **never auto-starts** it: when focus ends the
-    break is loaded and waits for Start; when a break ends the next focus is loaded and waits for Start
-- Save each completed focus session: `{ date: "YYYY-MM-DD" (local), completedAt: ISO string, durationMin }`
-- Stats: sessions today, total focus time, daily (last 7 days) and weekly (last 8 weeks) history as CSS bars
-- Settings live in a **drop-down card** opened by the ⚙ button (top right); it closes on ⚙, ✕, Esc
-  (focus returns to ⚙) or a click outside. Inside are browser-style expandable rows (one open at a time),
-  each with a live one-line summary:
-  - **Timer durations** — custom durations (validated 1–120 min) and "long break after N sessions" (1–12)
-  - **Site blocking** — see below
-  - **Garden** — "Show garden and messages" switch, flower picker, unlock button (applies immediately, no Save)
-  - **Appearance** — theme `System` (default, follows the OS live) | `Light` | `Dark`; applies and saves
-    immediately (no Save), keeps unsaved edits in other rows, and applies to the timer AND the blocked page.
-    Stored as `settings.theme`, so Save keeps it and Restore defaults returns it to System
-  - **Data** — "Clear focus history" and "Reset garden" (each asks for confirmation; neither deletes the other's data)
-  - Save / Restore defaults live in a footer below the rows; a failed save opens the card and the row with the invalid field
-- Site blocking settings (extension only):
-  - Mode: `off` (default) | `blocklist` (block only disallowed sites) | `allowlist` (block every site except allowed ones)
-  - Lists: one site per line; input like `https://www.youtube.com/watch` is normalized to `youtube.com`;
-    a domain also covers its subdomains; max 100 per list; allowlist mode requires at least one site
-  - Active **only while a focus session is running** — paused, idle and breaks are unblocked
-  - Changes to site settings apply immediately (durations still apply from the next session)
-  - Rules end automatically at the focus session's end time, even if the timer tab is closed
-  - Blocked page "Back to timer" returns to the running timer tab (most recently used one) and closes the
-    blocked tab; if no timer tab is open, the blocked tab becomes the timer
-- Sakura Garden (reward system, original design):
-  - **Only focus sessions of at least 25 min (`Garden.MIN_FOCUS_MINUTES`) affect the garden.** Shorter
-    focus (e.g. 1 min) never grows, blooms, earns petals or wilts; the plant stays a seed and the coach says
-    "N-min focus won't grow the garden — plants need 25+ min." The session itself is still saved for stats.
-    The length checked is the loaded/running session's (`durationMs`), not a pending settings edit
-  - While focus runs the plant grows by share of the session done: seed 0 % → sprout 20 % → leaves 45 % →
-    bud 70 % → bloom 100 %. Breaks grow nothing
-  - Completed focus → a **bloom** of the selected flower + **1 petal per focus minute**
-  - **Pause never wilts.** Reset after ≥ 1 min of focus → a **wilted** plant (no petals); reset in the first minute → nothing
-  - Petals are spent to unlock flowers: Sakura (free) · Tulip 100 · Sunflower 250 · Lotus 500 · Moonflower 1000;
-    the selected flower grows next
-  - Stats card **Garden** toggle (next to Daily/Weekly): petal count, the live plant with "Sakura · bud · 4 min
-    to bloom", and the last 7 days of plants on a soil strip (newest on the right)
-  - **Smart messages** (`#coach` line under Start/Reset) come from the user's own numbers, never random quotes,
-    and change only on events (start, new stage, pause, reset, complete, break), never every tick
-  - Switch off → coach line and Garden toggle hidden (the app looks as before the garden) and nothing is recorded
-  - Stored as `pomodoro.v1.garden`: `{ enabled, petals, unlocked[], selected, plants: [{ date, type,
-    state: 'bloom' | 'wilted', minutes }] }`; at most 500 plants (oldest dropped, petals kept)
-
-## Conventions
-- Script order: `storage.js` → `theme.js` load **without `defer` in `<head>`** (theme set before paint, on
-  every page); the rest load with `<script defer>` at the end of `<body>`:
-  `timer.js` → `stats.js` → `garden.js` → `blocker.js` → `app.js`
-- Each page-side JS file exposes exactly one global object: `AppStorage`, `Theme`, `Timer`, `Stats`, `Garden`, `SiteBlocker`;
+## Script loading
+- `storage.js` → `theme.js` load **without `defer` in `<head>`** on every page (theme set before paint);
+  the rest load with `<script defer>` at the end of `<body>`: `timer.js` → `stats.js` → `garden.js` → `blocker.js` → `app.js`
+- Each page-side file exposes exactly one global: `AppStorage`, `Theme`, `Timer`, `Stats`, `Garden`, `SiteBlocker`;
   `app.js`, `blocked.js` and `background.js` expose nothing
-  (not `Storage` — that name is the browser's built-in `window.Storage` interface)
-- Timer accuracy: compute remaining time from an `endTime` timestamp, never by counting ticks
-- Wrap every `localStorage` read/write in `try/catch` and fall back to defaults
-- Only focus sessions that run to completion are saved (reset = nothing saved)
-- `garden.js` functions never mutate a garden: they return a new object; `app.js` saves it via `storeGarden()`
-  (`AppStorage.saveGarden` + re-render). Storage checks only the shape; which flowers exist is `Garden.CATALOG`
-- Dates use the user's local time zone; weeks start on Monday
-- Charts: plain `<div>` bars sized via a CSS custom property (`--h`); no canvas libraries
-- Use `const`/`let`, `===`, small named functions; no inline `onclick` attributes in HTML
-- Accessibility: real `<button>` elements, visible focus styles, `aria-live` on the time display
-
-## Design
-- Theme: **soft pastel dreamy** — lavender → pink → baby-blue gradient, large blurred drifting light blobs,
-  twinkling four-point sparkles, a few falling sakura petals; dark theme = dusky violet
-- **Theme (light/dark) — follow this everywhere:**
-  - Light colors are the `:root` tokens; dark colors live in ONE block, `:root[data-theme="dark"]`. Never add a
-    `@media (prefers-color-scheme)` block or a second dark block — `theme.js` already resolves System via `matchMedia`
-  - Every new color is a token defined in BOTH places (light `:root` + the dark block), incl. glows/tints/gradients
-  - `color-scheme` is set per theme so native controls (scrollbars, inputs) match
-  - Every page links `css/style.css` and loads `storage.js` + `theme.js` in `<head>`; new pages must too
-  - Check every UI change in Light, Dark and System (OS light + dark); tests emulate the OS with
-    `Emulation.setEmulatedMedia` and assert `document.documentElement.dataset.theme`
-- **One screen, no page scroll:** `body { overflow: hidden }`, `.app` is `100dvh` (top bar + `.stage`);
-  timer and stats side by side, stacked below 860px; sizes use `clamp()`/`vh` so it fits from phone to desktop.
-  Only windows shorter than 560px fall back to page scrolling. The settings card scrolls inside itself if needed
-- Timer is a **progress ring**: `#progressBar.ring-progress` is a conic-gradient masked into a ring, driven by the
-  `--p` percentage that `app.js` sets; ring size is the `--ring` custom property on `.timer`
-- Settings drop-down is native `<details class="settings-menu">` (⚙ = its `<summary>`) holding
-  `<section class="settings-card">`; rows are `<details class="setting-row" name="settings">` (exclusive accordion);
-  row summaries (`#durationsSummary`, `#blockingSummary`, `#gardenSummary`, `#appearanceSummary`, `#dataSummary`)
-  always describe the **saved** settings
-- Plants are one inline SVG **sprite** in `index.html` (`<symbol id="plant-seed|sprout|leaves|bud|bloom|wilted">`)
-  reused with `<use>`; flower colors come from variables (`--flower`, `--flower-edge`, `--flower-center`, `--leaf`, …)
-  set by the `.flower-<id>` / `.is-wilted` classes. `app.js` draws plants only via `createPlant()` / `setPlant()`
-- The garden view fills the same area as the chart; below 860px it becomes a compact strip so the page never scrolls
-- All artwork is original CSS + inline SVG: **no images, web fonts, icon fonts or CDNs**; rounded system fonts only
-  (`ui-rounded` / `Segoe UI Variable Display`; `Yu Gothic UI` / `Meiryo` for Japanese)
-- The scene is one `<div class="scene" aria-hidden="true">` fixed behind `.app` (`pointer-events: none`);
-  `index.html` and `blocked.html` contain the same scene markup — keep them in sync
-- Cards are frosted glass (`--glass`, `--glass-strong` + `backdrop-filter`); accents: violet `--primary`,
-  sakura pink `--sakura`; mode colors focus lavender / short mint / long sky; buttons use a violet → pink gradient
-- Colors are CSS custom properties on `:root`, redefined in `:root[data-theme="dark"]` — never hard-code colors in rules.
-  This includes glows, tints and gradients (`--gradient-brand`, `--gradient-text`, `--icon-tint`, `--btn-glow`, …);
-  the only literal allowed outside `:root` is `black` in the progress-ring `mask` (alpha, not a visible color)
-- Reuse instead of copying: gradient headings/numbers use the `.gradient-text` class; violet → pink fills use
-  `var(--gradient-brand)`; one date-key helper (`AppStorage.toDateKey`); one `plural()` and one
-  `blockingPhrase()` in `app.js`; saved/restored settings go through `applySettings()`
-- Animate only `transform`/`opacity`; `prefers-reduced-motion: reduce` stops every animation and hides petals
 
 ## Running
 - **Timer only:** open `index.html` directly in a browser (works from `file://`). No install or server required.
-- **With site blocking (Chrome/Edge):** `chrome://extensions` (or `edge://extensions`) → enable Developer mode →
-  Load unpacked → select this project folder → click the extension's toolbar icon to open the timer.
-  After editing files, press the reload button on the extension card.
-- The two ways of running have **separate** `localStorage` (different origins), so stats/settings are not shared.
+- **With site blocking:** load the folder as an unpacked extension (steps in `.claude/rules/extension.md`).
+  The extension and `file://` have separate `localStorage`, so stats/settings are not shared.
 
 ## Testing
-Automated tests use **Node 22+ built-ins only** (no npm, no `package.json`) and drive real browsers through the
-Chrome DevTools protocol. Run from the project root:
+Node 22+ built-ins only (no npm, no `package.json`); the e2e suites drive real browsers through the Chrome
+DevTools protocol. Run all three from the project root before committing:
 ```
 node tests/unit.mjs            # storage.js, stats.js, timer.js, garden.js in Node        ~1 s
-node tests/e2e-page.mjs        # index.html via file:// in headless Chrome (or Edge)     ~30 s
+node tests/e2e-page.mjs        # index.html via file:// in headless Chrome (or Edge)     ~1 min
 node tests/e2e-extension.mjs   # loads the extension unpacked in headless Edge            ~2 min
 ```
-- Each prints PASS/FAIL per check and exits non-zero on any failure; run all three before committing
-- Browsers are found automatically; override with `CHROME_PATH` / `EDGE_PATH`
-- The extension suite needs **Edge** (current Chrome ignores `--load-extension`) and includes one real-time
-  (~60 s) alarm check; it skips the "Back to timer" checks if that button is commented out in `blocked.html`
+- Each prints PASS/FAIL per check and exits non-zero on any failure; browsers are found automatically
+  (override with `CHROME_PATH` / `EDGE_PATH`)
 - Screenshots go to `tests/output/` (git-ignored); browser profiles are throw-away folders in the OS temp dir
 - When behaviour changes, update the matching checks in the same commit
+
+## Workflow
+Implement one phase at a time and stop after each phase for review.
 
 ## Manual test checklist
 Tip: set Focus/Short = 1 min, Long = 2, "Long break after" = 2 in Settings for a fast cycle.
@@ -236,6 +150,3 @@ Site blocking (load the extension unpacked first; use `example.com` / `example.o
 
 Known behaviour: the timer itself is not persisted, so reloading the timer tab mid-focus shows an idle
 timer while blocking continues until that session's original end time (the background alarm ends it).
-
-## Workflow
-Implement one phase at a time and stop after each phase for review.
