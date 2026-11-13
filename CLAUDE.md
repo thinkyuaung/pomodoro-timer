@@ -14,7 +14,8 @@ distracting websites during focus sessions.
 - No external libraries, CDNs, or npm packages (no build step, no `package.json`)
 - All storage code lives in `js/storage.js` — no other file may call `localStorage` directly
 - Only `js/app.js` (timer page) and `js/blocked.js` (blocked page) touch the DOM; `timer.js`, `stats.js`,
-  `garden.js` and `blocker.js` have no DOM access
+  `garden.js` and `blocker.js` have no DOM access. Single exception: `js/theme.js` sets ONLY
+  `<html data-theme>`
 - `chrome.*` extension APIs are used only in `js/blocker.js` (page side) and `js/background.js` (service worker)
 - `js/background.js` keeps no persistent state: only session blocking rules + one `chrome.alarms` alarm
 - The app must keep working as a plain page opened from `file://`; blocking is then simply unavailable
@@ -26,10 +27,11 @@ distracting websites during focus sessions.
 ## Structure
 ```
 index.html        Markup only: pastel scene, plant SVG sprite, one-screen app; loads the scripts in order
-blocked.html      "Blocked during focus" page (same pastel scene); loads only blocker.js + blocked.js
+blocked.html      "Blocked during focus" page (same pastel scene); loads storage.js + theme.js, blocker.js + blocked.js
 manifest.json     Manifest V3 extension definition (permissions, background worker, toolbar action)
 css/style.css     Theme tokens, pastel scene, glass cards, progress ring, plants/garden, settings drop-down, chart, blocked page
-js/storage.js     AppStorage object: settings (incl. site lists), session history and garden in localStorage
+js/storage.js     AppStorage object: settings (incl. site lists, theme), session history and garden in localStorage
+js/theme.js       Theme object: applies the saved theme as <html data-theme="light|dark"> before paint (every page)
 js/timer.js       Timer object: countdown engine and focus/break mode switching
 js/stats.js       Stats object: pure calculations over saved sessions (uses AppStorage.toDateKey)
 js/garden.js      Garden object: pure garden rules (flowers, stages, petals, unlocks) + smart messages
@@ -53,6 +55,9 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
   - **Timer durations** — custom durations (validated 1–120 min) and "long break after N sessions" (1–12)
   - **Site blocking** — see below
   - **Garden** — "Show garden and messages" switch, flower picker, unlock button (applies immediately, no Save)
+  - **Appearance** — theme `System` (default, follows the OS live) | `Light` | `Dark`; applies and saves
+    immediately (no Save), keeps unsaved edits in other rows, and applies to the timer AND the blocked page.
+    Stored as `settings.theme`, so Save keeps it and Restore defaults returns it to System
   - **Data** — "Clear focus history" and "Reset garden" (each asks for confirmation; neither deletes the other's data)
   - Save / Restore defaults live in a footer below the rows; a failed save opens the card and the row with the invalid field
 - Site blocking settings (extension only):
@@ -65,6 +70,10 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
   - Blocked page "Back to timer" returns to the running timer tab (most recently used one) and closes the
     blocked tab; if no timer tab is open, the blocked tab becomes the timer
 - Sakura Garden (reward system, original design):
+  - **Only focus sessions of at least 25 min (`Garden.MIN_FOCUS_MINUTES`) affect the garden.** Shorter
+    focus (e.g. 1 min) never grows, blooms, earns petals or wilts; the plant stays a seed and the coach says
+    "N-min focus won't grow the garden — plants need 25+ min." The session itself is still saved for stats.
+    The length checked is the loaded/running session's (`durationMs`), not a pending settings edit
   - While focus runs the plant grows by share of the session done: seed 0 % → sprout 20 % → leaves 45 % →
     bud 70 % → bloom 100 %. Breaks grow nothing
   - Completed focus → a **bloom** of the selected flower + **1 petal per focus minute**
@@ -80,9 +89,10 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
     state: 'bloom' | 'wilted', minutes }] }`; at most 500 plants (oldest dropped, petals kept)
 
 ## Conventions
-- Scripts load with `<script defer>` in dependency order:
-  `storage.js` → `timer.js` → `stats.js` → `garden.js` → `blocker.js` → `app.js`
-- Each page-side JS file exposes exactly one global object: `AppStorage`, `Timer`, `Stats`, `Garden`, `SiteBlocker`;
+- Script order: `storage.js` → `theme.js` load **without `defer` in `<head>`** (theme set before paint, on
+  every page); the rest load with `<script defer>` at the end of `<body>`:
+  `timer.js` → `stats.js` → `garden.js` → `blocker.js` → `app.js`
+- Each page-side JS file exposes exactly one global object: `AppStorage`, `Theme`, `Timer`, `Stats`, `Garden`, `SiteBlocker`;
   `app.js`, `blocked.js` and `background.js` expose nothing
   (not `Storage` — that name is the browser's built-in `window.Storage` interface)
 - Timer accuracy: compute remaining time from an `endTime` timestamp, never by counting ticks
@@ -97,7 +107,15 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
 
 ## Design
 - Theme: **soft pastel dreamy** — lavender → pink → baby-blue gradient, large blurred drifting light blobs,
-  twinkling four-point sparkles, a few falling sakura petals; dark mode (`prefers-color-scheme: dark`) = dusky violet
+  twinkling four-point sparkles, a few falling sakura petals; dark theme = dusky violet
+- **Theme (light/dark) — follow this everywhere:**
+  - Light colors are the `:root` tokens; dark colors live in ONE block, `:root[data-theme="dark"]`. Never add a
+    `@media (prefers-color-scheme)` block or a second dark block — `theme.js` already resolves System via `matchMedia`
+  - Every new color is a token defined in BOTH places (light `:root` + the dark block), incl. glows/tints/gradients
+  - `color-scheme` is set per theme so native controls (scrollbars, inputs) match
+  - Every page links `css/style.css` and loads `storage.js` + `theme.js` in `<head>`; new pages must too
+  - Check every UI change in Light, Dark and System (OS light + dark); tests emulate the OS with
+    `Emulation.setEmulatedMedia` and assert `document.documentElement.dataset.theme`
 - **One screen, no page scroll:** `body { overflow: hidden }`, `.app` is `100dvh` (top bar + `.stage`);
   timer and stats side by side, stacked below 860px; sizes use `clamp()`/`vh` so it fits from phone to desktop.
   Only windows shorter than 560px fall back to page scrolling. The settings card scrolls inside itself if needed
@@ -105,7 +123,8 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
   `--p` percentage that `app.js` sets; ring size is the `--ring` custom property on `.timer`
 - Settings drop-down is native `<details class="settings-menu">` (⚙ = its `<summary>`) holding
   `<section class="settings-card">`; rows are `<details class="setting-row" name="settings">` (exclusive accordion);
-  row summaries (`#durationsSummary`, `#blockingSummary`, `#gardenSummary`, `#dataSummary`) always describe the **saved** settings
+  row summaries (`#durationsSummary`, `#blockingSummary`, `#gardenSummary`, `#appearanceSummary`, `#dataSummary`)
+  always describe the **saved** settings
 - Plants are one inline SVG **sprite** in `index.html` (`<symbol id="plant-seed|sprout|leaves|bud|bloom|wilted">`)
   reused with `<use>`; flower colors come from variables (`--flower`, `--flower-edge`, `--flower-center`, `--leaf`, …)
   set by the `.flower-<id>` / `.is-wilted` classes. `app.js` draws plants only via `createPlant()` / `setPlant()`
@@ -116,7 +135,7 @@ tests/            Dev-only test scripts (never loaded by the app) — see Testin
   `index.html` and `blocked.html` contain the same scene markup — keep them in sync
 - Cards are frosted glass (`--glass`, `--glass-strong` + `backdrop-filter`); accents: violet `--primary`,
   sakura pink `--sakura`; mode colors focus lavender / short mint / long sky; buttons use a violet → pink gradient
-- Colors are CSS custom properties on `:root`, redefined in the dark-mode media query — never hard-code colors in rules.
+- Colors are CSS custom properties on `:root`, redefined in `:root[data-theme="dark"]` — never hard-code colors in rules.
   This includes glows, tints and gradients (`--gradient-brand`, `--gradient-text`, `--icon-tint`, `--btn-glow`, …);
   the only literal allowed outside `:root` is `black` in the progress-ring `mask` (alpha, not a visible color)
 - Reuse instead of copying: gradient headings/numbers use the `.gradient-text` class; violet → pink fills use
@@ -166,17 +185,23 @@ Tip: set Focus/Short = 1 min, Long = 2, "Long break after" = 2 in Settings for a
 
 Settings rows and theme:
 - [ ] ⚙ opens the settings card (gear turns violet); ✕, Esc (focus back on ⚙) and a click outside close it
-- [ ] All four rows start closed; opening one closes the other; chevron flips; keyboard Enter/Space toggles a row
+- [ ] All five rows start closed; opening one closes the other; chevron flips; keyboard Enter/Space toggles a row
 - [ ] Row summaries match saved settings (e.g. "50 / 10 / 20 min · long break every 3", "Blocking 3 sites during focus")
       and do not change until Save
 - [ ] Invalid value in a closed row → Save opens that row and focuses the field
 - [ ] Data → Clear focus history: Cancel keeps everything; OK empties stats/chart and the summary says "0 focus sessions saved"
 - [ ] No page scrollbar at desktop (1280×760), laptop (1366×640) and phone (390×844) sizes
 - [ ] Progress ring fills violet → pink as the session runs
-- [ ] Scene: blobs drift, sparkles twinkle, petals fall; dark mode is dusky violet; OS "reduce motion" freezes it
+- [ ] Scene: blobs drift, sparkles twinkle, petals fall; dark theme is dusky violet; OS "reduce motion" freezes it
+- [ ] Appearance → System follows the OS live (switch OS light/dark without reloading); Light stays light on a
+      dark OS and Dark stays dark on a light OS; summary "Match system" / "Light" / "Dark"
+- [ ] Changing the theme does not lose unsaved edits in other rows; Save keeps the theme; Restore defaults → System
+- [ ] Reload → theme kept with no light→dark flash; the blocked page uses the same theme
 - [ ] Glass cards stay readable over the pastel background in light and dark mode
 
-Sakura Garden (tip: Focus = 5 min makes each stage ~1 min):
+Sakura Garden (Focus must be ≥ 25 min for the garden; DevTools `Date.now` skew or patience needed):
+- [ ] Focus = 1 min → coach "1-min focus won't grow the garden — plants need 25+ min."; plant stays a seed;
+      completing or resetting it changes nothing in the garden, but "Sessions today" still +1
 - [ ] Load → coach says "First bloom of the day starts here — plant a Sakura."
 - [ ] Start → "Seed planted"; the Garden view's plant sways and becomes sprout → leaves → bud as time passes,
       each with its own message (once, not every second)

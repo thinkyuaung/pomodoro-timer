@@ -36,6 +36,9 @@ const Garden = (() => {
   /** Resetting a focus session wilts the plant only after this much focus. */
   const WILT_AFTER_MS = 60 * 1000;
 
+  /** Only focus sessions at least this long touch the garden (grow, bloom, earn petals or wilt). */
+  const MIN_FOCUS_MINUTES = 25;
+
   // ---------- catalog ----------
 
   function flowerById(id) {
@@ -75,6 +78,14 @@ const Garden = (() => {
   /** 1 petal per whole focus minute. */
   function petalsFor(minutes) {
     return Math.max(0, Math.floor(minutes));
+  }
+
+  /**
+   * Does this session count for the garden? Only focus sessions of MIN_FOCUS_MINUTES or more.
+   * @param {number} sessionMinutes the length of the loaded/running session (not pending settings)
+   */
+  function affectsGarden(mode, sessionMinutes) {
+    return mode === 'focus' && sessionMinutes >= MIN_FOCUS_MINUTES;
   }
 
   /** Should resetting now wilt the plant? Only during focus and after the first minute. */
@@ -173,7 +184,7 @@ const Garden = (() => {
 
   /**
    * Picks the message for a timer/garden event, built from the user's own numbers.
-   * @param {string} event  'idle' | 'stage' | 'paused' | 'complete' | 'wilt' | 'break' | 'long' | 'ready'
+   * @param {string} event  'idle' | 'tooShort' | 'stage' | 'paused' | 'complete' | 'wilt' | 'break' | 'long' | 'ready'
    * @param {object} ctx    { flower, focusMin, stage, bloomsToday, bloomsYesterday, earnedText ("25 petals"),
    *                          nextUnlock, breakMin, bloomSaved, cycleLength } — only the fields the event needs
    * @returns {{ text: string, icon: string }} icon = sprite stage id for the small plant before the text
@@ -199,6 +210,8 @@ const Garden = (() => {
           : { text: `Rest your eyes for ${ctx.breakMin} min.`, icon: 'seed' };
       case 'long':
         return { text: `Cycle of ${ctx.cycleLength} complete — enjoy a long rest.`, icon: 'bloom' };
+      case 'tooShort':
+        return { text: `${ctx.focusMin}-min focus won't grow the garden — plants need ${MIN_FOCUS_MINUTES}+ min.`, icon: 'seed' };
       case 'ready':
         return { text: `Break over — a new ${name} seed is ready.`, icon: 'seed' };
       default:
@@ -210,6 +223,8 @@ const Garden = (() => {
     CATALOG,
     STAGES,
     WILT_AFTER_MS,
+    MIN_FOCUS_MINUTES,
+    affectsGarden,
     flowerById,
     flowerName,
     displayType,

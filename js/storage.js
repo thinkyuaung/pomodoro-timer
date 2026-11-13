@@ -9,7 +9,8 @@
  *   settings: {
  *     focus, short, long, longEvery,          // minutes, minutes, minutes, count
  *     blockMode: 'off' | 'blocklist' | 'allowlist',
- *     blockedSites: string[], allowedSites: string[]   // bare domains, e.g. "youtube.com"
+ *     blockedSites: string[], allowedSites: string[],  // bare domains, e.g. "youtube.com"
+ *     theme: 'system' | 'light' | 'dark'                // color theme (theme.js applies it)
  *   }
  *   session:  { date: "YYYY-MM-DD" (local), completedAt: ISO string, durationMin: number }
  *   garden:   { enabled: boolean, petals: number, unlocked: string[], selected: string,
@@ -30,6 +31,7 @@ const AppStorage = (() => {
   const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
   const BLOCK_MODES = Object.freeze(['off', 'blocklist', 'allowlist']);
+  const THEMES = Object.freeze(['system', 'light', 'dark']);
   const MAX_SITES = 100;
 
   const DEFAULTS = Object.freeze({
@@ -40,6 +42,7 @@ const AppStorage = (() => {
     blockMode: 'off',
     blockedSites: Object.freeze([]),
     allowedSites: Object.freeze([]),
+    theme: 'system',
   });
 
   /** Numeric settings and their allowed [min, max]. */
@@ -60,6 +63,7 @@ const AppStorage = (() => {
     blockMode: 'Site blocking mode',
     blockedSites: 'Disallowed sites',
     allowedSites: 'Allowed sites',
+    theme: 'Theme',
   });
 
   // ---------- low-level helpers (never throw) ----------
@@ -136,13 +140,15 @@ const AppStorage = (() => {
       }
     }
 
-    // Blocking mode (missing = default; unknown value = error)
-    const mode = input.blockMode === undefined ? DEFAULTS.blockMode : input.blockMode;
-    if (BLOCK_MODES.includes(mode)) {
-      settings.blockMode = mode;
-    } else {
-      fail('blockMode', `${LABELS.blockMode} is not valid.`);
-      settings.blockMode = DEFAULTS.blockMode;
+    // One-of choices (missing = default; unknown value = error)
+    for (const [field, allowed] of [['blockMode', BLOCK_MODES], ['theme', THEMES]]) {
+      const value = input[field] === undefined ? DEFAULTS[field] : input[field];
+      if (allowed.includes(value)) {
+        settings[field] = value;
+      } else {
+        fail(field, `${LABELS[field]} is not valid.`);
+        settings[field] = DEFAULTS[field];
+      }
     }
 
     // Site lists (missing = empty)
@@ -343,6 +349,7 @@ const AppStorage = (() => {
     DEFAULTS,
     LIMITS,
     BLOCK_MODES,
+    THEMES,
     MAX_SITES,
     toDateKey,
     normalizeSite,

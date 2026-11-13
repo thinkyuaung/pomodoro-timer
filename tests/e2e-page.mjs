@@ -171,10 +171,10 @@ await click('#reset');
 // 15. Settings rows (accordion), summaries, reveal-on-error, clear history
 await load();
 const rowsOpen = () => ev(`[...document.querySelectorAll('.setting-row')].map(d => d.open)`);
-check(JSON.stringify(await rowsOpen()) === '[false,false,false,false]', 'four rows, all closed initially');
+check(JSON.stringify(await rowsOpen()) === '[false,false,false,false,false]', 'five rows, all closed initially');
 await ev(`document.querySelectorAll('.setting-row summary')[0].click()`); await sleep(100);
 await ev(`document.querySelectorAll('.setting-row summary')[1].click()`); await sleep(100);
-check(JSON.stringify(await rowsOpen()) === '[false,true,false,false]', 'opening a row closes the other (exclusive)', JSON.stringify(await rowsOpen()));
+check(JSON.stringify(await rowsOpen()) === '[false,true,false,false,false]', 'opening a row closes the other (exclusive)', JSON.stringify(await rowsOpen()));
 const sums = () => ev(`['#durationsSummary','#blockingSummary','#dataSummary'].map(s => document.querySelector(s).textContent)`);
 let sm = await sums();
 check(sm[0] === '2 / 5 / 15 min · long break every 4' && sm[1] === 'Blocking 2 sites during focus · needs the extension' && sm[2] === '0 focus sessions saved',
@@ -185,7 +185,7 @@ await ev(`document.forms[0].requestSubmit()`);
 check((await sums())[0] === '40 / 5 / 15 min · long break every 4', 'summary updates after Save', (await sums())[0]);
 await ev(`document.querySelectorAll('.setting-row')[1].open = true`); // durations row closed
 await ev(`document.forms[0].elements.long.value = '500'; document.forms[0].requestSubmit()`); await sleep(200);
-check(JSON.stringify(await rowsOpen()) === '[true,false,false,false]' && (await ev(`document.activeElement.name`)) === 'long', 'invalid value opens its row and focuses the field');
+check(JSON.stringify(await rowsOpen()) === '[true,false,false,false,false]' && (await ev(`document.activeElement.name`)) === 'long', 'invalid value opens its row and focuses the field');
 check((await ev(`document.querySelector('.settings-menu').open`)) === true, 'invalid value also opens the settings drop-down');
 
 // 16. Settings drop-down card: open/close paths + one-screen layout
@@ -232,13 +232,13 @@ const liveHref = () => ev(`document.querySelector('#livePlant use').getAttribute
 const growing = () => ev(`document.getElementById('livePlant').classList.contains('is-growing')`);
 const savedGarden = () => ev(`JSON.parse(localStorage.getItem('pomodoro.v1.garden') || 'null')`);
 check((await coachText()) === 'First bloom of the day starts here — plant a Sakura.' && (await coachIcon()) === '#plant-seed', 'garden: first-of-day message on load', await coachText());
-await setSettings({ focus: 10 }); await sleep(200);
+// default focus = 25 min, the shortest session that counts for the garden
 await click('#startPause'); await sleep(300);
 check((await coachText()) === 'Seed planted. See you at bloom.' && (await liveHref()) === '#plant-seed' && (await growing()), 'garden: Start plants a seed (growing)', await coachText());
-await skip(126);
+await skip(301);
 check((await coachText()) === 'It sprouted — keep going.' && (await liveHref()) === '#plant-sprout', 'garden: sprout at 20 %', await coachText());
-await skip(150);
-check((await coachText()) === 'Halfway — your leaves are out.' && (await liveHref()) === '#plant-leaves' && (await q('#liveStage')).startsWith('Sakura · leaves · 6 min'), 'garden: leaves at 45 % + live stage text', await q('#liveStage'));
+await skip(375);
+check((await coachText()) === 'Halfway — your leaves are out.' && (await liveHref()) === '#plant-leaves' && (await q('#liveStage')).startsWith('Sakura · leaves · 14 min'), 'garden: leaves at 45 % + live stage text', await q('#liveStage'));
 await click('#startPause'); await skip(300);
 check((await coachText()) === 'Paused — your plant will wait for you.' && !(await growing()) && (await liveHref()) === '#plant-leaves' && (await savedGarden()) === null,
   'garden: pause keeps the stage, no wilt', await coachText());
@@ -250,21 +250,39 @@ check((await coachText()).startsWith('That one wilted') && (await coachIcon()) =
   'garden: reset after 1 min wilts (no petals)', JSON.stringify(gd));
 await click('#startPause'); await skip(30); await click('#reset'); await sleep(200);
 check((await savedGarden()).plants.length === 1 && (await coachText()).startsWith('First bloom of the day'), 'garden: reset in the first minute does not wilt', await coachText());
-await click('#startPause'); await skip(601);
+await click('#startPause'); await skip(1501);
 gd = await savedGarden();
-check(gd.petals === 10 && gd.plants.length === 2 && gd.plants[1].state === 'bloom' && gd.plants[1].minutes === 10, 'garden: completed focus adds a bloom + 10 petals', JSON.stringify(gd));
-check((await coachText()) === 'Bloom #1 today · +10 petals' && (await coachIcon()) === '#plant-bloom', 'garden: completion message', await coachText());
+check(gd.petals === 25 && gd.plants.length === 2 && gd.plants[1].state === 'bloom' && gd.plants[1].minutes === 25, 'garden: completed 25-min focus adds a bloom + 25 petals', JSON.stringify(gd));
+check((await coachText()) === 'Bloom #1 today · +25 petals' && (await coachIcon()) === '#plant-bloom', 'garden: completion message', await coachText());
 await click('#startPause'); await sleep(200);
 check((await coachText()) === 'Bloom saved. Rest your eyes for 5 min.' && !(await growing()), 'garden: break message, nothing grows on breaks', await coachText());
 await skip(301);
 check((await coachText()) === 'Break over — a new Sakura seed is ready.', 'garden: break over message', await coachText());
 await load();
-check((await coachText()) === 'Plant a Sakura — 10 min to full bloom.' && (await savedGarden()).petals === 10, 'garden: persists across reload; idle message uses today\'s blooms', await coachText());
+check((await coachText()) === 'Plant a Sakura — 25 min to full bloom.' && (await savedGarden()).petals === 25, 'garden: persists across reload; idle message uses today\'s blooms', await coachText());
 await click('[data-range=garden]');
 check((await q('#liveStage')) === 'Sakura · ready to plant' && (await ev(`!document.getElementById('gardenPanel').hidden && document.getElementById('chart').hidden`)),
   'garden view: live plant ready to plant, chart hidden', await q('#liveStage'));
 await click('[data-range=daily]');
 check((await ev(`document.getElementById('gardenPanel').hidden && !document.getElementById('chart').hidden`)) && (await ev(`document.querySelectorAll('.bar-col').length`)) === 7, 'daily view restores the chart');
+
+// 17b. Focus shorter than Garden.MIN_FOCUS_MINUTES (25) never touches the garden; stats still count it
+const gardenBefore = JSON.stringify(await savedGarden());
+const sessionCount = () => ev(`JSON.parse(localStorage.getItem('pomodoro.v1.sessions') || '[]').length`);
+const sessionsBeforeShort = await sessionCount();
+const TOO_SHORT = "2-min focus won't grow the garden — plants need 25+ min.";
+await setSettings({ focus: 2 }); await sleep(200);
+check((await coachText()) === TOO_SHORT && (await q('#liveStage')) === 'Sakura · needs 25+ min focus to grow', 'short focus: message + live text explain the 25-min minimum', await coachText());
+await click('#startPause'); await skip(45);
+check(!(await growing()) && (await liveHref()) === '#plant-seed' && (await coachText()) === TOO_SHORT, 'short focus: plant does not grow, no stage messages');
+await click('#startPause'); await sleep(100);
+check((await coachText()) === TOO_SHORT, 'short focus: pause does not say "your plant will wait"', await coachText());
+await click('#startPause'); await skip(20); await click('#reset'); await sleep(200); // 65 s of a 2-min session: would wilt a 25-min plant
+check(JSON.stringify(await savedGarden()) === gardenBefore && (await coachText()) === TOO_SHORT, 'short focus: reset after 1 min does not wilt');
+await click('#startPause'); await skip(121);
+check(JSON.stringify(await savedGarden()) === gardenBefore && (await sessionCount()) === sessionsBeforeShort + 1,
+  'short focus: completing it saves the session (stats) but adds no bloom or petals');
+check((await coachText()) === 'Rest your eyes for 5 min.', 'short focus: break message does not claim a bloom', await coachText());
 
 // 18. Garden view, flower picker, unlocks, on/off switch, reset garden
 await ev(`localStorage.clear()`);
@@ -302,10 +320,9 @@ check((await q('#coach', 'hidden')) === true && (await q('#gardenToggle', 'hidde
   && (await ev(`document.querySelector('[data-range=daily]').getAttribute('aria-pressed')`)) === 'true' && (await q('#gardenSummary')) === 'Off',
   'switch off: coach + Garden toggle hidden, back to the Daily chart');
 const plantsBefore = (await savedGarden()).plants.length;
-await setSettings({ focus: 1 }); await sleep(200);
-await click('#startPause'); await skip(30); await click('#reset'); await sleep(100); // would not wilt anyway (< 1 min)
-await click('#startPause'); await skip(61);
-check((await savedGarden()).plants.length === plantsBefore && (await savedGarden()).petals === 10, 'switch off: a completed session grows nothing');
+await click('#startPause'); await skip(120); await click('#reset'); await sleep(100); // 25-min focus reset after 2 min: would wilt if on
+await click('#startPause'); await skip(1501);
+check((await savedGarden()).plants.length === plantsBefore && (await savedGarden()).petals === 10, 'switch off: a 25-min session neither wilts nor blooms');
 await click('#reset');
 await load();
 check((await q('#coach', 'hidden')) === true && (await q('#gardenEnabled', 'checked')) === false, 'switch off persists across reload');
@@ -331,6 +348,46 @@ for (const [w, h] of [[1280, 760], [1366, 640], [390, 844]]) {
   check((await ev(`document.documentElement.scrollHeight <= innerHeight && document.documentElement.scrollWidth <= innerWidth`)), `garden view with 60 plants: no page scroll at ${w}×${h}`);
 }
 await send('Emulation.clearDeviceMetricsOverride');
+
+// 19. Appearance: System / Light / Dark theme (Settings → Appearance), applied on every page
+const osScheme = (value) => send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value }] });
+const themeNow = () => ev(`document.documentElement.dataset.theme`);
+const textToken = () => ev(`getComputedStyle(document.documentElement).getPropertyValue('--text').trim()`);
+const savedTheme = () => ev(`JSON.parse(localStorage.getItem('pomodoro.v1.settings') || '{}').theme`);
+const pickTheme = (value) => ev(`(() => { const r = document.querySelector('[name=theme][value=${value}]'); r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+await osScheme('light');
+await ev(`localStorage.clear()`);
+await load();
+check((await ev(`[...document.head.querySelectorAll('script')].map(s => s.src.split('/').pop() + (s.defer ? '+defer' : '')).join()`)) === 'storage.js,theme.js',
+  'theme: storage.js + theme.js load un-deferred in <head> (theme set before paint)');
+check((await themeNow()) === 'light' && (await q('#appearanceSummary')) === 'Match system' && (await q('[name=theme][value=system]', 'checked')) === true,
+  'theme: default System → light on a light OS');
+await osScheme('dark'); await sleep(150);
+check((await themeNow()) === 'dark' && (await textToken()) === '#f3e8ff' && (await ev(`getComputedStyle(document.documentElement).colorScheme`)) === 'dark',
+  'theme: System follows the OS live (dark tokens + color-scheme)', await textToken());
+await ev(`document.forms[0].elements.focus.value = '33'`); // unsaved edit in another row
+await pickTheme('light'); await sleep(100);
+check((await themeNow()) === 'light' && (await textToken()) === '#3b2f5c' && (await savedTheme()) === 'light' && (await q('#appearanceSummary')) === 'Light',
+  'theme: Light overrides a dark OS, saved immediately');
+check((await ev(`document.forms[0].elements.focus.value`)) === '33' && JSON.parse(await ev(`localStorage.getItem('pomodoro.v1.settings')`)).focus === 25,
+  'theme: changing it keeps unsaved edits in other rows (and does not save them)');
+await pickTheme('dark'); await sleep(100);
+await ev(`document.forms[0].requestSubmit()`); await sleep(100);
+check((await savedTheme()) === 'dark' && JSON.parse(await ev(`localStorage.getItem('pomodoro.v1.settings')`)).focus === 33, 'theme: Save keeps the chosen theme');
+await osScheme('light'); await sleep(150);
+check((await themeNow()) === 'dark', 'theme: Dark stays dark on a light OS');
+await load();
+check((await themeNow()) === 'dark' && (await q('[name=theme][value=dark]', 'checked')) === true && (await q('#appearanceSummary')) === 'Dark', 'theme: persists across reload');
+await send('Page.navigate', { url: pathToFileURL(path.join(projectDir, 'blocked.html')).href }); await sleep(600);
+check((await themeNow()) === 'dark' && (await textToken()) === '#f3e8ff', 'theme: blocked page uses the same saved theme');
+await load();
+await ev(`document.getElementById('restoreDefaults').click()`); await sleep(100);
+check((await ev(`localStorage.getItem('pomodoro.v1.settings')`)) === null && (await themeNow()) === 'light' && (await q('#appearanceSummary')) === 'Match system',
+  'theme: Restore defaults → System (follows the light OS again)');
+await ev(`localStorage.setItem('pomodoro.v1.settings', JSON.stringify({ theme: 'neon' }))`);
+await load();
+check((await themeNow()) === 'light' && (await q('#appearanceSummary')) === 'Match system', 'theme: tampered value falls back to System');
+await send('Emulation.setEmulatedMedia', { features: [] });
 
 check(errors.length === 0, 'no console errors / exceptions', errors.join(' | '));
 

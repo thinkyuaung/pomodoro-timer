@@ -2,6 +2,7 @@
    Theme tokens — soft pastel dreamy (light) / dusky violet (dark)
    ========================================================================== */
 :root {
+  color-scheme: light;
   /* Scene */
   --bg: linear-gradient(135deg, #f3e8ff 0%, #fce7f3 48%, #e0f2fe 100%);
   --bg-fallback: #f5eafc;
@@ -84,55 +85,56 @@
   --font: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", "Segoe UI", system-ui, "Yu Gothic UI", "Meiryo", sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: linear-gradient(135deg, #1e1b3a 0%, #2e1f4d 50%, #172554 100%);
-    --bg-fallback: #241d42;
-    --blob-1: #7c3aed;
-    --blob-2: #db2777;
-    --blob-3: #0284c7;
-    --blob-4: #6d28d9;
-    --blob-opacity: 0.32;
-    --sparkle: #f5f3ff;
-    --petal-a: rgb(253 226 239 / 0.55);
-    --petal-b: rgb(249 168 212 / 0.45);
+/* Dark theme. theme.js sets <html data-theme="light|dark"> from Settings → Appearance
+   (System follows the OS live). This is the ONLY place dark colors are defined. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: linear-gradient(135deg, #1e1b3a 0%, #2e1f4d 50%, #172554 100%);
+  --bg-fallback: #241d42;
+  --blob-1: #7c3aed;
+  --blob-2: #db2777;
+  --blob-3: #0284c7;
+  --blob-4: #6d28d9;
+  --blob-opacity: 0.32;
+  --sparkle: #f5f3ff;
+  --petal-a: rgb(253 226 239 / 0.55);
+  --petal-b: rgb(249 168 212 / 0.45);
 
-    --glass: rgb(30 27 58 / 0.55);
-    --glass-strong: rgb(30 27 58 / 0.92);
-    --glass-border: rgb(196 181 253 / 0.18);
-    --panel: rgb(255 255 255 / 0.05);
-    --text: #f3e8ff;
-    --muted: #c4b5fd;
-    --border: rgb(196 181 253 / 0.2);
-    --track: rgb(76 59 130 / 0.55);
+  --glass: rgb(30 27 58 / 0.55);
+  --glass-strong: rgb(30 27 58 / 0.92);
+  --glass-border: rgb(196 181 253 / 0.18);
+  --panel: rgb(255 255 255 / 0.05);
+  --text: #f3e8ff;
+  --muted: #c4b5fd;
+  --border: rgb(196 181 253 / 0.2);
+  --track: rgb(76 59 130 / 0.55);
 
-    --primary: #c084fc;
-    --primary-strong: #a855f7;
-    --sakura: #f472b6;
-    --focus: #c084fc;
-    --short: #5eead4;
-    --long: #93c5fd;
-    --on-accent: #1e1b3a;
+  --primary: #c084fc;
+  --primary-strong: #a855f7;
+  --sakura: #f472b6;
+  --focus: #c084fc;
+  --short: #5eead4;
+  --long: #93c5fd;
+  --on-accent: #1e1b3a;
 
-    --success: #5eead4;
-    --danger: #fb7185;
-    --danger-tint: rgb(251 113 133 / 0.12);
-    --row-highlight: rgb(255 255 255 / 0.04);
-    --bar-from: #7c3aed;
-    --bar-to: #c4b5fd;
+  --success: #5eead4;
+  --danger: #fb7185;
+  --danger-tint: rgb(251 113 133 / 0.12);
+  --row-highlight: rgb(255 255 255 / 0.04);
+  --bar-from: #7c3aed;
+  --bar-to: #c4b5fd;
 
-    --soil: #4a3a5e;
-    --seed: #b08a6c;
-    --stem: #6ee7b7;
-    --leaf: #34a37a;
-    --leaf-edge: #6ee7b7;
-    --wilt: #6b5f72;
-    --wilt-edge: #8f8197;
-    --flower-moonflower: #c7e6fb;
-    --bed: linear-gradient(to bottom, transparent 62%, rgb(74 58 94 / 0.55) 62%);
+  --soil: #4a3a5e;
+  --seed: #b08a6c;
+  --stem: #6ee7b7;
+  --leaf: #34a37a;
+  --leaf-edge: #6ee7b7;
+  --wilt: #6b5f72;
+  --wilt-edge: #8f8197;
+  --flower-moonflower: #c7e6fb;
+  --bed: linear-gradient(to bottom, transparent 62%, rgb(74 58 94 / 0.55) 62%);
 
-    --shadow: 0 2px 8px rgb(0 0 0 / 0.3), 0 20px 50px rgb(0 0 0 / 0.35);
-  }
+  --shadow: 0 2px 8px rgb(0 0 0 / 0.3), 0 20px 50px rgb(0 0 0 / 0.35);
 }
 
 /* Per-mode accent color (set data-mode on .app) */

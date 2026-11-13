@@ -48,6 +48,7 @@
     durationsSummary: $('#durationsSummary'),
     blockingSummary: $('#blockingSummary'),
     dataSummary: $('#dataSummary'),
+    appearanceSummary: $('#appearanceSummary'),
     clearHistory: $('#clearHistory'),
     settingsMenu: $('.settings-menu'),
     gearBtn: $('.gear-btn'),
@@ -57,7 +58,8 @@
   const MODE_NAMES = { focus: 'Focus', short: 'Short Break', long: 'Long Break' };
   const NUMBER_FIELDS = Object.keys(AppStorage.LIMITS);
   const SITE_FIELDS = ['blockedSites', 'allowedSites'];
-  const ALL_FIELDS = [...NUMBER_FIELDS, 'blockMode', ...SITE_FIELDS];
+  const ALL_FIELDS = [...NUMBER_FIELDS, 'blockMode', ...SITE_FIELDS, 'theme'];
+  const THEME_NAMES = { system: 'Match system', light: 'Light', dark: 'Dark' };
 
   const MODE_HINTS = {
     off: 'Blocking is off. All sites are allowed during focus.',
@@ -154,6 +156,7 @@
       `${s.focus} / ${s.short} / ${s.long} min · long break every ${s.longEvery}`;
     els.blockingSummary.textContent = blockingSummaryText(s);
     els.dataSummary.textContent = `${plural(sessions.length, 'focus session')} saved`;
+    els.appearanceSummary.textContent = THEME_NAMES[s.theme];
   }
 
   /** Opens the settings row that contains the given field so its error is visible. */
@@ -307,6 +310,7 @@
     for (const field of SITE_FIELDS) {
       els.form.elements[field].value = settings[field].join('\n');
     }
+    els.form.elements.theme.value = settings.theme;
     markInvalid([]);
     renderBlockModeUI();
   }
@@ -327,6 +331,7 @@
     for (const field of SITE_FIELDS) {
       values[field] = els.form.elements[field].value; // newline-separated text
     }
+    values.theme = els.form.elements.theme.value; // already saved on change; Save must not reset it
     return values;
   }
 
@@ -353,6 +358,22 @@
     showFormMessage(appliedMessage(appliedNow || !durationsChanged(before, result.settings)), true);
   }
 
+  /**
+   * Theme applies and saves immediately (no Save needed). Only the theme changes: unsaved edits in
+   * other rows stay in the form, because the SAVED settings + new theme are written, not the form.
+   */
+  function onThemeChange(theme) {
+    const result = AppStorage.saveSettings({ ...currentSettings, theme });
+    if (!result.ok) {
+      showFormMessage(result.errors.join(' '));
+      els.form.elements.theme.value = currentSettings.theme;
+      return;
+    }
+    currentSettings = result.settings;
+    Theme.apply(theme);
+    renderSettingSummaries();
+  }
+
   function onRestoreDefaults() {
     const appliedNow = applySettings(AppStorage.resetSettings());
     showFormMessage(appliedMessage(appliedNow).replace('Saved', 'Defaults restored'), true);
@@ -365,6 +386,7 @@
   function applySettings(settings) {
     fillForm(settings);
     currentSettings = settings;
+    Theme.apply(settings.theme);
     renderSettingSummaries();
     const appliedNow = timer.updateSettings(settings);
     renderMode(timer.getState());
@@ -393,17 +415,28 @@
     return Garden.stageFor(elapsedMs(state) / state.durationMs);
   }
 
+  /** Length of the loaded/running session in minutes (not pending settings). */
+  function sessionMinutes(state) {
+    return state.durationMs / 60000;
+  }
+
+  /** Does this session count for the garden? Focus of at least Garden.MIN_FOCUS_MINUTES (garden switch aside). */
+  function gardenGrows(state) {
+    return Garden.affectsGarden(state.mode, sessionMinutes(state));
+  }
+
   function liveStageText(state) {
     const name = Garden.flowerName(garden.selected);
     if (state.mode !== 'focus') return `Resting · next up: ${name}`;
+    if (!gardenGrows(state)) return `${name} · needs ${Garden.MIN_FOCUS_MINUTES}+ min focus to grow`;
     if (elapsedMs(state) === 0) return `${name} · ready to plant`;
     const minutesLeft = Math.ceil(state.remainingMs / 60000);
     return `${name} · ${stageOf(state)} · ${minutesLeft} min to bloom`;
   }
 
   function renderLivePlant(state) {
-    const growing = state.mode === 'focus' && state.running;
-    const stage = state.mode === 'focus' ? stageOf(state) : 'seed';
+    const growing = gardenGrows(state) && state.running;
+    const stage = gardenGrows(state) ? stageOf(state) : 'seed';
     const key = `${garden.selected}|${stage}|${growing}`;
     if (key !== lastLivePlantKey) {
       lastLivePlantKey = key;
@@ -436,14 +469,16 @@
 
   /** Message for a loaded session (and a running break): uses the session's real length, not pending settings. */
   function coachWaiting(state) {
-    if (state.mode === 'focus') coach('idle');
-    else if (state.mode === 'long') coach('long', { cycleLength: state.longEvery });
+    if (state.mode === 'focus') {
+      if (gardenGrows(state)) coach('idle');
+      else coach('tooShort', { focusMin: Math.round(sessionMinutes(state)) });
+    } else if (state.mode === 'long') coach('long', { cycleLength: state.longEvery });
     else coach('break', { breakMin: Math.round(state.durationMs / 60000) });
   }
 
   /** Announces each new growth stage once while focus runs (never every tick). */
   function coachGrowth(state) {
-    if (state.mode !== 'focus' || !state.running) return;
+    if (!gardenGrows(state) || !state.running) return;
     const stage = stageOf(state);
     if (stage === lastStage) return;
     lastStage = stage;
@@ -457,9 +492,9 @@
     renderGarden();
   }
 
-  /** Before a reset: a focus session reset after the first minute wilts its plant. */
+  /** Before a reset: a garden-sized focus session reset after the first minute wilts its plant. */
   function wiltIfNeeded(state) {
-    if (!garden.enabled || !Garden.shouldWilt(state.mode, elapsedMs(state))) return false;
+    if (!garden.enabled || !gardenGrows(state) || !Garden.shouldWilt(state.mode, elapsedMs(state))) return false;
     storeGarden(Garden.recordWilt(garden, elapsedMs(state) / 60000));
     return true;
   }
@@ -690,9 +725,11 @@
       if (!AppStorage.addSession(durationMin)) {
         console.warn('[app] focus session could not be saved');
       }
-      lastBloomSaved = garden.enabled;
-      lastEarned = garden.enabled ? Garden.petalsFor(durationMin) : 0;
-      if (!garden.enabled) return; // garden switched off: nothing grows
+      // Garden switched off, or a session shorter than Garden.MIN_FOCUS_MINUTES: the garden is untouched
+      const grows = garden.enabled && Garden.affectsGarden('focus', durationMin);
+      lastBloomSaved = grows;
+      lastEarned = grows ? Garden.petalsFor(durationMin) : 0;
+      if (!grows) return;
       storeGarden(Garden.recordBloom(garden, durationMin));
     },
   });
@@ -705,7 +742,7 @@
     timer.toggle();
     const state = timer.getState();
     announce(state.running ? 'Timer started.' : 'Timer paused.');
-    if (state.mode !== 'focus') coachWaiting(state); // breaks: rest message, running or paused
+    if (state.mode !== 'focus' || !gardenGrows(state)) coachWaiting(state); // breaks / short focus: no growth messages
     else if (!state.running) coach('paused', { stage: stageOf(state) });
   });
 
@@ -751,6 +788,7 @@
   });
   els.form.addEventListener('change', (event) => {
     if (event.target.name === 'blockMode') renderBlockModeUI();
+    if (event.target.name === 'theme') onThemeChange(event.target.value);
     if (event.target.name === 'gardenFlower') onFlowerSelect(event.target.value);
   });
 

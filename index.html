@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pomodoro Timer</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- Not deferred: the saved theme is applied before the page paints (no light→dark flash) -->
+  <script src="js/storage.js"></script>
+  <script src="js/theme.js"></script>
 </head>
 <body>
   <!-- Decorative pastel scene (CSS only). Keep in sync with blocked.html -->
@@ -231,7 +234,29 @@
                 </div>
               </details>
 
-              <!-- Row 4: data -->
+              <!-- Row 4: appearance (applies immediately, like the garden row) -->
+              <details class="setting-row" name="settings">
+                <summary>
+                  <span class="row-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z"/></svg>
+                  </span>
+                  <span class="row-text">
+                    <span class="row-title">Appearance</span>
+                    <span id="appearanceSummary" class="row-summary">Match system</span>
+                  </span>
+                  <span class="row-chevron" aria-hidden="true"></span>
+                </summary>
+                <div class="row-body">
+                  <div class="segmented" role="radiogroup" aria-label="Theme">
+                    <label><input type="radio" name="theme" value="system" checked><span>System</span></label>
+                    <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+                    <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+                  </div>
+                  <p class="hint">System follows your device's light/dark setting. Applies to the timer and the blocked page.</p>
+                </div>
+              </details>
+
+              <!-- Row 5: data -->
               <details class="setting-row" name="settings">
                 <summary>
                   <span class="row-icon" aria-hidden="true">
@@ -351,7 +376,6 @@
     </main>
   </div>
 
-  <script defer src="js/storage.js"></script>
   <script defer src="js/timer.js"></script>
   <script defer src="js/stats.js"></script>
   <script defer src="js/garden.js"></script>

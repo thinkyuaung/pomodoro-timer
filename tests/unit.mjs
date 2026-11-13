@@ -86,6 +86,17 @@ function fakeLocalStorage() {
   S.addSession(25);
   S.clearSessions();
   check(S.getSessions().length === 0, 'clearSessions empties history');
+
+  // theme setting
+  check(S.resetSettings().theme === 'system', 'theme default: system');
+  r = S.saveSettings({ ...S.getSettings(), theme: 'dark' });
+  check(r.ok && S.getSettings().theme === 'dark', 'theme dark saved and read back');
+  r = S.saveSettings({ ...S.getSettings(), theme: 'neon' });
+  check(!r.ok && r.invalidFields.includes('theme') && S.getSettings().theme === 'dark', 'unknown theme rejected, nothing written');
+  ls.store[KEY] = JSON.stringify({ focus: 30, short: 5, long: 15, longEvery: 4 });
+  check(S.getSettings().theme === 'system', 'old saved settings (no theme) load as system');
+  ls.store[KEY] = JSON.stringify({ ...S.DEFAULTS, theme: 42 });
+  check(S.getSettings().theme === 'system', 'tampered theme falls back to system');
 }
 
 // ---------------------------------------------------------------- stats.js
@@ -213,6 +224,11 @@ function fakeLocalStorage() {
   check([25, 1, 0.9, 0, -3].map(G.petalsFor).join() === '25,1,0,0,0', '1 petal per whole focus minute');
   check(!G.shouldWilt('focus', 59999) && G.shouldWilt('focus', 60000) && !G.shouldWilt('short', 600000),
     'wilt only after 1 min of focus, never on breaks');
+  check(G.MIN_FOCUS_MINUTES === 25 && G.affectsGarden('focus', 25) && G.affectsGarden('focus', 50) && !G.affectsGarden('focus', 24.9) && !G.affectsGarden('focus', 1),
+    'garden counts only focus sessions of 25+ min');
+  check(!G.affectsGarden('short', 30) && !G.affectsGarden('long', 30), 'breaks never count for the garden');
+  check(G.message('tooShort', { focusMin: 1 }).text === "1-min focus won't grow the garden — plants need 25+ min." && G.message('tooShort', { focusMin: 1 }).icon === 'seed',
+    'message for a focus session too short to grow');
 
   let g = G.recordBloom(fresh, 25, now);
   check(g.petals === 25 && g.plants.length === 1 && g.plants[0].state === 'bloom' && g.plants[0].date === '2026-11-03' && g.plants[0].type === 'sakura',
